@@ -2,10 +2,36 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import * as ascii from "../src/ascii.js";
-import * as grapheme from "../src/grapheme.js";
+import * as grapheme from "../src/grapheme_internal.js";
 import * as width from "../src/width.js";
-import { get, getProperties, graphemes, stringWidth } from "../src/index.js";
-import { getBoolean, getCodePoints, getNumber, getString } from "../src/get.js";
+import {
+  equalFold,
+  generalCategory,
+  graphemes,
+  isASCIIHexDigit,
+  isDash,
+  isDiacritic,
+  isEmojiPresentation,
+  isGraphic,
+  isHexDigit,
+  isNoncharacter,
+  isPatternSyntax,
+  isPatternWhiteSpace,
+  isPrint,
+  isPunct,
+  isQuotationMark,
+  isSpace,
+  isSymbol,
+  isTitle,
+  isUnifiedIdeograph,
+  stringWidth,
+  simpleFold,
+  toLower,
+  toTitle,
+  toUpper,
+  isVariationSelector,
+} from "../src/index.js";
+import { get, getBoolean, getCodePoints, getNumber, getProperties, getString } from "../src/get.js";
 import type { FieldValueFor, GeneralCategory, Script } from "../src/get.js";
 
 test("ascii helpers", () => {
@@ -27,6 +53,7 @@ test("core Unicode properties", () => {
   assert.equal(get("general_category", 65), "letter_uppercase");
   assert.equal(get("general_category", 0x2200), "symbol_math");
   assert.equal(getNumber("case_folding_simple", 65), 97);
+  assert.equal(getNumber("simple_fold", 0x006b), 0x212a);
   assert.equal(getNumber("simple_uppercase_mapping", 0x03c2), 0x03a3);
   assert.deepEqual(getCodePoints("uppercase_mapping", 0x00df), [0x0053, 0x0053]);
   assert.deepEqual(getCodePoints("decomposition_mapping", 0x00c0), [0x0041, 0x0300]);
@@ -50,7 +77,7 @@ test("core Unicode properties", () => {
 });
 
 test("categorical Unicode properties expose literal union types", () => {
-  const category: GeneralCategory = get("general_category", 0x2200);
+  const category: GeneralCategory = generalCategory(0x2200);
   const categoryFromMap: FieldValueFor<"general_category"> = category;
   const script: Script = get("script", 0x03b1);
   assert.equal(categoryFromMap, "symbol_math");
@@ -101,6 +128,92 @@ test("derived boolean properties", () => {
   assert.equal(get("original_grapheme_break", 0x000d), "cr");
 });
 
+test("Go-style Unicode predicate helpers", () => {
+  assert.equal(toUpper(0x0061), 0x0041);
+  assert.equal(toUpper(0x00b5), 0x039c);
+  assert.equal(toUpper(0x0041), 0x0041);
+  assert.equal(toLower(0x0041), 0x0061);
+  assert.equal(toLower(0x0130), 0x0069);
+  assert.equal(toLower(0x0061), 0x0061);
+  assert.equal(toTitle(0x01c6), 0x01c5);
+  assert.equal(toTitle(0x0061), 0x0041);
+  assert.equal(toTitle(0x0041), 0x0041);
+  assert.equal(simpleFold(0x004b), 0x006b);
+  assert.equal(simpleFold(0x006b), 0x212a);
+  assert.equal(simpleFold(0x212a), 0x004b);
+  assert.equal(simpleFold(0x0031), 0x0031);
+  assert.equal(isTitle(0x01c5), true);
+  assert.equal(isTitle(0x0041), false);
+  assert.equal(isPunct(0x002e), true);
+  assert.equal(isPunct(0x2014), true);
+  assert.equal(isPunct(0x0041), false);
+  assert.equal(isSymbol(0x20ac), true);
+  assert.equal(isSymbol(0x1f600), true);
+  assert.equal(isSymbol(0x0041), false);
+  assert.equal(isGraphic(0x0041), true);
+  assert.equal(isGraphic(0x3000), true);
+  assert.equal(isGraphic(0x000a), false);
+  assert.equal(isPrint(0x0041), true);
+  assert.equal(isPrint(0x0020), true);
+  assert.equal(isPrint(0x3000), false);
+  assert.equal(isPrint(0x000a), false);
+  assert.equal(isSpace(0x0020), true);
+  assert.equal(isSpace(0x0009), true);
+  assert.equal(isSpace(0x00a0), true);
+  assert.equal(isSpace(0x3000), true);
+  assert.equal(isSpace(0x0041), false);
+  assert.equal(isASCIIHexDigit(0x0066), true);
+  assert.equal(isASCIIHexDigit(0x0046), true);
+  assert.equal(isASCIIHexDigit(0x0039), true);
+  assert.equal(isASCIIHexDigit(0xff26), false);
+  assert.equal(isHexDigit(0x0066), true);
+  assert.equal(isHexDigit(0xff26), true);
+  assert.equal(isHexDigit(0x0067), false);
+  assert.equal(isDash(0x002d), true);
+  assert.equal(isDash(0x2014), true);
+  assert.equal(isDash(0x0041), false);
+  assert.equal(isDiacritic(0x0300), true);
+  assert.equal(isDiacritic(0x005e), true);
+  assert.equal(isDiacritic(0x0041), false);
+  assert.equal(isQuotationMark(0x0022), true);
+  assert.equal(isQuotationMark(0x201c), true);
+  assert.equal(isQuotationMark(0x0041), false);
+  assert.equal(isPatternSyntax(0x002b), true);
+  assert.equal(isPatternSyntax(0x2192), true);
+  assert.equal(isPatternSyntax(0x0041), false);
+  assert.equal(isPatternWhiteSpace(0x200e), true);
+  assert.equal(isPatternWhiteSpace(0x000a), true);
+  assert.equal(isPatternWhiteSpace(0x0041), false);
+  assert.equal(isVariationSelector(0xfe0f), true);
+  assert.equal(isVariationSelector(0x0041), false);
+  assert.equal(isNoncharacter(0xfffe), true);
+  assert.equal(isNoncharacter(0x10ffff), true);
+  assert.equal(isNoncharacter(0x0041), false);
+  assert.equal(isUnifiedIdeograph(0x754c), true);
+  assert.equal(isUnifiedIdeograph(0x20000), true);
+  assert.equal(isUnifiedIdeograph(0x0041), false);
+});
+
+test("simple string case folding", () => {
+  assert.equal(equalFold("hello", "HELLO"), true);
+  assert.equal(equalFold("K", "\u212a"), true);
+  assert.equal(equalFold("\u212a", "k"), true);
+  assert.equal(equalFold("\u00b5", "\u039c"), true);
+  assert.equal(equalFold("\u03a3", "\u03c2"), true);
+  assert.equal(equalFold("stra\u00dfe", "STRASSE"), false);
+  assert.equal(equalFold("abc", "ab"), false);
+  assert.equal(equalFold("abc", "abd"), false);
+  assert.equal(equalFold("界", "界"), true);
+  assert.equal(equalFold("界", "畍"), false);
+});
+
+test("public code point helpers reject invalid code points", () => {
+  assert.throws(() => generalCategory(-1), RangeError);
+  assert.throws(() => isSpace(0x110000), RangeError);
+  assert.throws(() => toUpper(1.5), RangeError);
+  assert.throws(() => width.codePointWidth(Number.NaN), RangeError);
+});
+
 test("emoji and wcwidth code point properties", () => {
   assert.equal(getBoolean("is_emoji", 0x1f600), true);
   assert.equal(getBoolean("is_emoji_presentation", 0x1f600), true);
@@ -116,6 +229,7 @@ test("emoji and wcwidth code point properties", () => {
   assert.equal(getNumber("wcwidth_standalone", 0x00a1), 1);
   assert.equal(getNumber("wcwidth_standalone", 0x4e00), 2);
   assert.equal(getBoolean("wcwidth_zero_in_grapheme", 0x0300), true);
+  assert.equal(isEmojiPresentation(0x1f600), true);
   assert.equal(getBoolean("wcwidth_zero_in_grapheme", 0x0903), false);
 });
 

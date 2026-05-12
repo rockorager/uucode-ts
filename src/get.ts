@@ -11,11 +11,14 @@ import type {
   IndicSyllabicCategory,
   JoiningGroup,
   JoiningType,
+  LineBreak,
   NumericType,
   OriginalGraphemeBreak,
   Script,
+  SentenceBreak,
   SpecialCasingCondition,
   UnicodeBlock,
+  WordBreak,
 } from "./generated/types.js";
 
 export type {
@@ -30,11 +33,14 @@ export type {
   IndicSyllabicCategory,
   JoiningGroup,
   JoiningType,
+  LineBreak,
   NumericType,
   OriginalGraphemeBreak,
   Script,
+  SentenceBreak,
   SpecialCasingCondition,
   UnicodeBlock,
+  WordBreak,
 } from "./generated/types.js";
 
 export type CodePoint = number;
@@ -71,11 +77,14 @@ export interface FieldValueMap {
   indic_positional_category: IndicPositionalCategory;
   indic_syllabic_category: IndicSyllabicCategory;
   is_alphabetic: boolean;
+  is_ascii_hex_digit: boolean;
   is_bidi_mirrored: boolean;
   is_case_ignorable: boolean;
   is_cased: boolean;
   is_composition_exclusion: boolean;
+  is_dash: boolean;
   is_default_ignorable: boolean;
+  is_diacritic: boolean;
   is_emoji: boolean;
   is_emoji_component: boolean;
   is_emoji_modifier: boolean;
@@ -86,15 +95,24 @@ export interface FieldValueMap {
   is_grapheme_base: boolean;
   is_grapheme_extend: boolean;
   is_grapheme_link: boolean;
+  is_hex_digit: boolean;
   is_id_continue: boolean;
   is_id_start: boolean;
   is_lowercase: boolean;
   is_math: boolean;
+  is_noncharacter: boolean;
+  is_pattern_syntax: boolean;
+  is_pattern_white_space: boolean;
+  is_quotation_mark: boolean;
+  is_unified_ideograph: boolean;
   is_uppercase: boolean;
+  is_variation_selector: boolean;
+  is_white_space: boolean;
   is_xid_continue: boolean;
   is_xid_start: boolean;
   joining_group: JoiningGroup;
   joining_type: JoiningType;
+  line_break: LineBreak;
   lowercase_mapping: number[];
   name: string;
   numeric_type: NumericType;
@@ -103,6 +121,9 @@ export interface FieldValueMap {
   numeric_value_numeric: string;
   original_grapheme_break: OriginalGraphemeBreak;
   script: Script;
+  sentence_break: SentenceBreak;
+  simple_fold: number;
+  simple_fold_key: number;
   simple_lowercase_mapping: number;
   simple_titlecase_mapping: number;
   simple_uppercase_mapping: number;
@@ -118,6 +139,7 @@ export interface FieldValueMap {
   uppercase_mapping: number[];
   wcwidth_standalone: number;
   wcwidth_zero_in_grapheme: boolean;
+  word_break: WordBreak;
 }
 
 export type Field = keyof FieldValueMap;
@@ -143,6 +165,8 @@ export type StringField = FieldsMatching<string>;
 const numberFields = [
   "canonical_combining_class",
   "case_folding_simple",
+  "simple_fold",
+  "simple_fold_key",
   "simple_lowercase_mapping",
   "simple_titlecase_mapping",
   "simple_uppercase_mapping",
@@ -166,11 +190,14 @@ const booleanFields = [
   "changes_when_uppercased",
   "has_special_casing",
   "is_alphabetic",
+  "is_ascii_hex_digit",
   "is_bidi_mirrored",
   "is_case_ignorable",
   "is_cased",
   "is_composition_exclusion",
+  "is_dash",
   "is_default_ignorable",
+  "is_diacritic",
   "is_emoji",
   "is_emoji_component",
   "is_emoji_modifier",
@@ -181,11 +208,19 @@ const booleanFields = [
   "is_grapheme_base",
   "is_grapheme_extend",
   "is_grapheme_link",
+  "is_hex_digit",
   "is_id_continue",
   "is_id_start",
   "is_lowercase",
   "is_math",
+  "is_noncharacter",
+  "is_pattern_syntax",
+  "is_pattern_white_space",
+  "is_quotation_mark",
+  "is_unified_ideograph",
   "is_uppercase",
+  "is_variation_selector",
+  "is_white_space",
   "is_xid_continue",
   "is_xid_start",
   "wcwidth_zero_in_grapheme",
@@ -226,12 +261,15 @@ const stringFields = [
   "indic_syllabic_category",
   "joining_group",
   "joining_type",
+  "line_break",
   "name",
   "numeric_type",
   "numeric_value_numeric",
   "original_grapheme_break",
   "script",
+  "sentence_break",
   "unicode_1_name",
+  "word_break",
 ] as const satisfies readonly StringField[];
 
 const fields = [
@@ -276,11 +314,14 @@ const defaults: { [K in Field]: FieldValueFor<K> } = {
   indic_positional_category: "not_applicable",
   indic_syllabic_category: "other",
   is_alphabetic: false,
+  is_ascii_hex_digit: false,
   is_bidi_mirrored: false,
   is_case_ignorable: false,
   is_cased: false,
   is_composition_exclusion: false,
+  is_dash: false,
   is_default_ignorable: false,
+  is_diacritic: false,
   is_emoji: false,
   is_emoji_component: false,
   is_emoji_modifier: false,
@@ -291,15 +332,24 @@ const defaults: { [K in Field]: FieldValueFor<K> } = {
   is_grapheme_base: false,
   is_grapheme_extend: false,
   is_grapheme_link: false,
+  is_hex_digit: false,
   is_id_continue: false,
   is_id_start: false,
   is_lowercase: false,
   is_math: false,
+  is_noncharacter: false,
+  is_pattern_syntax: false,
+  is_pattern_white_space: false,
+  is_quotation_mark: false,
+  is_unified_ideograph: false,
   is_uppercase: false,
+  is_variation_selector: false,
+  is_white_space: false,
   is_xid_continue: false,
   is_xid_start: false,
   joining_group: "no_joining_group",
   joining_type: "non_joining",
+  line_break: "xx",
   lowercase_mapping: [],
   name: "",
   numeric_type: "none",
@@ -308,6 +358,9 @@ const defaults: { [K in Field]: FieldValueFor<K> } = {
   numeric_value_numeric: "",
   original_grapheme_break: "other",
   script: "unknown",
+  sentence_break: "other",
+  simple_fold: 0,
+  simple_fold_key: 0,
   simple_lowercase_mapping: 0,
   simple_titlecase_mapping: 0,
   simple_uppercase_mapping: 0,
@@ -323,10 +376,13 @@ const defaults: { [K in Field]: FieldValueFor<K> } = {
   uppercase_mapping: [],
   wcwidth_standalone: 1,
   wcwidth_zero_in_grapheme: false,
+  word_break: "other",
 };
 
 const cpDefaultFields = new Set<Field>([
   "case_folding_simple",
+  "simple_fold",
+  "simple_fold_key",
   "simple_lowercase_mapping",
   "simple_titlecase_mapping",
   "simple_uppercase_mapping",

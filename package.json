@@ -19,8 +19,8 @@
       "import": "./dist/src/grapheme.js"
     },
     "./properties": {
-      "types": "./dist/src/get.d.ts",
-      "import": "./dist/src/get.js"
+      "types": "./dist/src/properties.d.ts",
+      "import": "./dist/src/properties.js"
     },
     "./ascii": {
       "types": "./dist/src/ascii.d.ts",

@@ -145,6 +145,20 @@ const emojiPropNames: Record<string, string> = {
   Extended_Pictographic: "is_extended_pictographic",
 };
 
+const propListNames: Record<string, string> = {
+  White_Space: "is_white_space",
+  ASCII_Hex_Digit: "is_ascii_hex_digit",
+  Hex_Digit: "is_hex_digit",
+  Dash: "is_dash",
+  Diacritic: "is_diacritic",
+  Quotation_Mark: "is_quotation_mark",
+  Pattern_Syntax: "is_pattern_syntax",
+  Pattern_White_Space: "is_pattern_white_space",
+  Variation_Selector: "is_variation_selector",
+  Noncharacter_Code_Point: "is_noncharacter",
+  Unified_Ideograph: "is_unified_ideograph",
+};
+
 function fill<T>(value: T): T[] {
   return Array<T>(COUNT).fill(value);
 }
@@ -305,9 +319,30 @@ const caseFoldingSimpleOnly = fill<number | null>(null);
 const caseFoldingFullOnly = Array.from({ length: COUNT }, () => [] as number[]);
 const caseFoldingSimple = fill(0);
 const caseFoldingFull = Array.from({ length: COUNT }, () => [] as number[]);
+const foldParent = new Map<number, number>();
 for (let cp = 0; cp < COUNT; cp += 1) {
   caseFoldingSimple[cp] = cp;
   caseFoldingFull[cp] = [cp];
+}
+
+function foldFind(cp: number): number {
+  const parent = foldParent.get(cp);
+  if (parent === undefined) {
+    foldParent.set(cp, cp);
+    return cp;
+  }
+  if (parent === cp) return cp;
+  const foldRoot = foldFind(parent);
+  foldParent.set(cp, foldRoot);
+  return foldRoot;
+}
+
+function foldUnion(a: number, b: number): void {
+  const rootA = foldFind(a);
+  const rootB = foldFind(b);
+  if (rootA === rootB) return;
+  if (rootA < rootB) foldParent.set(rootB, rootA);
+  else foldParent.set(rootA, rootB);
 }
 
 for (const line of readLines("CaseFolding.txt")) {
@@ -317,8 +352,14 @@ for (const line of readLines("CaseFolding.txt")) {
   const status = fields[1]!;
   const mapping = fields[2]!.split(/\s+/).map(hex);
   if (status === "T") caseFoldingTurkishOnly[cp] = mapping[0]!;
-  if (status === "C") caseFoldingCommonOnly[cp] = mapping[0]!;
-  if (status === "S") caseFoldingSimpleOnly[cp] = mapping[0]!;
+  if (status === "C") {
+    caseFoldingCommonOnly[cp] = mapping[0]!;
+    foldUnion(cp, mapping[0]!);
+  }
+  if (status === "S") {
+    caseFoldingSimpleOnly[cp] = mapping[0]!;
+    foldUnion(cp, mapping[0]!);
+  }
   if (status === "F") caseFoldingFullOnly[cp] = mapping;
 }
 for (let cp = 0; cp < COUNT; cp += 1) {
@@ -327,6 +368,27 @@ for (let cp = 0; cp < COUNT; cp += 1) {
   caseFoldingFull[cp] = caseFoldingFullOnly[cp]!.length
     ? caseFoldingFullOnly[cp]!
     : [caseFoldingCommonOnly[cp] ?? cp];
+}
+
+const simpleFold = fill(0);
+const simpleFoldKey = fill(0);
+for (let cp = 0; cp < COUNT; cp += 1) simpleFold[cp] = cp;
+for (let cp = 0; cp < COUNT; cp += 1) simpleFoldKey[cp] = cp;
+const foldGroups = new Map<number, number[]>();
+for (const cp of foldParent.keys()) {
+  const foldRoot = foldFind(cp);
+  const group = foldGroups.get(foldRoot);
+  if (group) group.push(cp);
+  else foldGroups.set(foldRoot, [cp]);
+}
+for (const group of foldGroups.values()) {
+  if (group.length < 2) continue;
+  group.sort((a, b) => a - b);
+  const key = group[0]!;
+  for (const [index, cp] of group.entries()) {
+    simpleFold[cp] = group[(index + 1) % group.length]!;
+    simpleFoldKey[cp] = key;
+  }
 }
 
 const hasSpecialCasing = fill(false);
@@ -425,6 +487,10 @@ for (const line of readLines("auxiliary/GraphemeBreakProperty.txt")) {
   setRange(originalGraphemeBreak, start, end, originalGraphemeMap[fields[1]!] ?? "other");
 }
 
+const wordBreak = parseRangeFile("auxiliary/WordBreakProperty.txt", "other");
+const sentenceBreak = parseRangeFile("auxiliary/SentenceBreakProperty.txt", "other");
+const lineBreak = parseRangeFile("LineBreak.txt", "xx");
+
 const emojiFields = Object.fromEntries(
   Object.values(emojiPropNames).map((field) => [field, fill(false)]),
 ) as Record<string, boolean[]>;
@@ -506,6 +572,18 @@ for (const line of readLines("CompositionExclusions.txt")) {
   setRange(isCompositionExclusion, start, end, true);
 }
 
+const propListFields = Object.fromEntries(
+  Object.values(propListNames).map((field) => [field, fill(false)]),
+) as Record<string, boolean[]>;
+for (const line of readLines("PropList.txt")) {
+  const fields = parseDataLine(line);
+  if (!fields) continue;
+  const name = propListNames[fields[1]!];
+  if (!name) continue;
+  const [start, end] = parseRange(fields[0]!);
+  setRange(propListFields[name]!, start, end, true);
+}
+
 const graphemeBreak = fill("other");
 for (let cp = 0; cp < COUNT; cp += 1) {
   const original = originalGraphemeBreak[cp]!;
@@ -565,6 +643,9 @@ const generated = {
     decomposition_type: toRanges(decompositionType, "default"),
     numeric_type: toRanges(numericType, "none"),
     east_asian_width: toRanges(eastAsianWidth, "neutral"),
+    word_break: toRanges(wordBreak, "other"),
+    sentence_break: toRanges(sentenceBreak, "other"),
+    line_break: toRanges(lineBreak, "xx"),
     original_grapheme_break: toRanges(originalGraphemeBreak, "other"),
     indic_conjunct_break: toRanges(indicConjunctBreak, "none"),
     grapheme_break: toRanges(graphemeBreak, "other"),
@@ -584,6 +665,9 @@ const generated = {
     ),
     is_emoji_vs_base: toRanges(isEmojiVsBase, false),
     is_composition_exclusion: toRanges(isCompositionExclusion, false),
+    ...Object.fromEntries(
+      Object.entries(propListFields).map(([name, data]) => [name, toRanges(data, false)]),
+    ),
     is_bidi_mirrored: toRanges(isBidiMirrored, false),
     has_special_casing: toRanges(hasSpecialCasing, false),
     wcwidth_zero_in_grapheme: toRanges(wcwidthZeroInGrapheme, false),
@@ -605,6 +689,8 @@ const generated = {
       ([cp, value]) => cp !== value,
     ),
     case_folding_simple: toSparse(caseFoldingSimple, 0).filter(([cp, value]) => cp !== value),
+    simple_fold: toSparse(simpleFold, 0).filter(([cp, value]) => cp !== value),
+    simple_fold_key: toSparse(simpleFoldKey, 0).filter(([cp, value]) => cp !== value),
     case_folding_full: toSparseArray(
       caseFoldingFull.map((value, cp) => (value.length === 1 && value[0] === cp ? [] : value)),
     ),
@@ -727,6 +813,12 @@ ${typeAlias("UnicodeBlock", unicodeBlock)}
 ${typeAlias("DecompositionType", decompositionType)}
 
 ${typeAlias("EastAsianWidth", eastAsianWidth)}
+
+${typeAlias("WordBreak", wordBreak)}
+
+${typeAlias("SentenceBreak", sentenceBreak)}
+
+${typeAlias("LineBreak", lineBreak)}
 
 ${typeAlias("GeneralCategory", generalCategory)}
 

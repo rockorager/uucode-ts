@@ -52,6 +52,9 @@ function rowGB(row: number): number {
 }
 
 export function codePointWidth(cp: number): number {
+  if (!Number.isInteger(cp) || cp < 0 || cp > runtimeWidth.maxCodePoint) {
+    throw new RangeError(`Invalid Unicode code point: ${cp}`);
+  }
   return (runtimeLookup(cp) >> 5) & WIDTH_MASK;
 }
 
