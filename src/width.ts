@@ -281,9 +281,65 @@ function widthNext(it: WidthIterator): number {
 }
 
 export function stringWidth(s: string): number {
-  let width = 0;
   for (let i = 0; i < s.length; i += 1) {
     const c = s.charCodeAt(i);
+    if (c < 0x80) {
+      if (c < 0x20 || c === 0x7f) return i + stringWidthAfterAsciiControl(s, i + 1);
+    } else {
+      if (c >= 0x300 && c <= 0x36f && i > 0) {
+        return stringWidthAfterSimpleCombiningMark(s, i, i - 1, i - 1, i);
+      }
+      if (i === 0) return stringWidthFrom(s, 0);
+      const previous = s.charCodeAt(i - 1);
+      return i - (previous >= 0x20 && previous !== 0x7f ? 1 : 0) + stringWidthFrom(s, i - 1);
+    }
+  }
+  return s.length;
+}
+
+function stringWidthAfterSimpleCombiningMark(
+  s: string,
+  start: number,
+  widthBeforeCluster: number,
+  clusterStart: number,
+  width: number,
+): number {
+  let canSkipCombiningMark = true;
+  for (let i = start; i < s.length; i += 1) {
+    const c = s.charCodeAt(i);
+    if (c < 0x80) {
+      if (c >= 0x20 && c !== 0x7f) {
+        widthBeforeCluster = width;
+        clusterStart = i;
+        width += 1;
+        canSkipCombiningMark = true;
+      } else {
+        widthBeforeCluster = width;
+        clusterStart = i + 1;
+        canSkipCombiningMark = false;
+      }
+    } else if (c >= 0x300 && c <= 0x36f && canSkipCombiningMark) {
+      continue;
+    } else {
+      return widthBeforeCluster + stringWidthFrom(s, clusterStart);
+    }
+  }
+  return width;
+}
+
+function stringWidthAfterAsciiControl(s: string, start: number): number {
+  let width = 0;
+  for (let i = start; i < s.length; i += 1) {
+    const c = s.charCodeAt(i);
+    if (
+      c >= 0x300 &&
+      c <= 0x36f &&
+      i > start &&
+      s.charCodeAt(i - 1) >= 0x20 &&
+      s.charCodeAt(i - 1) !== 0x7f
+    ) {
+      return stringWidthAfterSimpleCombiningMark(s, i, width - 1, i - 1, width);
+    }
     if (c >= 0x80) {
       if (i === 0) return stringWidthFrom(s, 0);
       const previous = s.charCodeAt(i - 1);

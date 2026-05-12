@@ -1,3 +1,6 @@
+import stringWidthPackage from "string-width";
+import wcwidth from "wcwidth";
+
 import { codePointWidth, get, stringWidth } from "../src/index.js";
 
 const samples = [
@@ -53,6 +56,8 @@ bench("uucode-ts is_alphabetic", () =>
 
 for (const { name, s } of benchmarkStrings) {
   benchWidth(`uucode-ts width/${name}`, () => stringWidth(s));
+  benchWidth(`string-width width/${name}`, () => stringWidthPackage(s));
+  benchWidth(`wcwidth width/${name}`, () => wcwidth(s));
 }
 
 i = 0;
