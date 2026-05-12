@@ -1,4 +1,4 @@
-# uucode-ts
+# @rockorager/uucode
 
 TypeScript port of [`jacobsandlund/uucode`](https://github.com/jacobsandlund/uucode).
 
@@ -13,7 +13,7 @@ import {
   isEmojiPresentation,
   stringWidth,
   toUpper,
-} from "uucode-ts";
+} from "@rockorager/uucode";
 
 generalCategory(0x2200); // "symbol_math"
 isEmojiPresentation(0x1f600); // true
@@ -31,10 +31,10 @@ for (const segment of graphemes("👩🏽‍🚀🇨🇭")) {
 Focused entry points are also available:
 
 ```ts
-import * as ascii from "uucode-ts/ascii";
-import { graphemes } from "uucode-ts/grapheme";
-import { isUpper } from "uucode-ts/properties";
-import { stringWidth } from "uucode-ts/width";
+import * as ascii from "@rockorager/uucode/ascii";
+import { graphemes } from "@rockorager/uucode/grapheme";
+import { isUpper } from "@rockorager/uucode/properties";
+import { stringWidth } from "@rockorager/uucode/width";
 ```
 
 ## Public API
@@ -65,12 +65,12 @@ import {
   toTitle,
   toUpper,
   wordBreak,
-} from "uucode-ts";
+} from "@rockorager/uucode";
 ```
 
 ### Properties
 
-`uucode-ts/properties` exposes code point property lookups, case mappings, and
+`@rockorager/uucode/properties` exposes code point property lookups, case mappings, and
 predicate helpers.
 
 ```ts
@@ -84,7 +84,7 @@ import {
   isPunct,
   isSpace,
   toLower,
-} from "uucode-ts/properties";
+} from "@rockorager/uucode/properties";
 
 generalCategory(0x41); // "letter_uppercase"
 eastAsianWidth(0xff01); // "fullwidth"
@@ -147,10 +147,10 @@ isExtendedPictographic(cp);
 
 ### Graphemes
 
-`uucode-ts/grapheme` exposes iterators over extended grapheme clusters.
+`@rockorager/uucode/grapheme` exposes iterators over extended grapheme clusters.
 
 ```ts
-import { GraphemeIterator, graphemes } from "uucode-ts/grapheme";
+import { GraphemeIterator, graphemes } from "@rockorager/uucode/grapheme";
 
 for (const item of graphemes("A\u0300🇨🇭")) {
   item.segment;
@@ -169,10 +169,10 @@ ignore control-code grapheme breaks.
 
 ### Width
 
-`uucode-ts/width` exposes terminal cell-width helpers:
+`@rockorager/uucode/width` exposes terminal cell-width helpers:
 
 ```ts
-import { codePointWidth, stringWidth } from "uucode-ts/width";
+import { codePointWidth, stringWidth } from "@rockorager/uucode/width";
 
 codePointWidth(0x3000); // 2
 stringWidth("A\u0300👩🏽‍🚀"); // 3
@@ -183,10 +183,10 @@ stringWidth("A\u0300👩🏽‍🚀"); // 3
 
 ### ASCII
 
-`uucode-ts/ascii` exposes small ASCII-only helpers:
+`@rockorager/uucode/ascii` exposes small ASCII-only helpers:
 
 ```ts
-import { isAlphanumeric, isHex, toLower, toUpper } from "uucode-ts/ascii";
+import { isAlphanumeric, isHex, toLower, toUpper } from "@rockorager/uucode/ascii";
 
 isAlphanumeric(0x41); // true
 isHex(0x66); // true
@@ -202,11 +202,11 @@ Available ASCII helpers are `isAscii`, `isAlphanumeric`, `isAlphabetic`,
 
 Benchmarks below were run on an Apple M4 Max with Node.js 22.19.0. Each row is
 based on `npm run benchmark`; lower `ns/op` is better. The ratio column is
-`baseline / uucode-ts`, so values above `1.00x` mean `uucode-ts` is faster.
+`baseline / @rockorager/uucode`, so values above `1.00x` mean `@rockorager/uucode` is faster.
 
 General category lookup has no direct native equivalent:
 
-| Benchmark | uucode-ts ns/op |
+| Benchmark | @rockorager/uucode ns/op |
 |---|---:|
 | `generalCategory` | 19.20 |
 | `codePointWidth` | 8.80 |
@@ -214,7 +214,7 @@ General category lookup has no direct native equivalent:
 Predicate APIs are benchmarked against precompiled Unicode property regular
 expressions on a rotating mixed code point corpus:
 
-| Predicate benchmark | uucode-ts ns/op | RegExp ns/op | Ratio |
+| Predicate benchmark | @rockorager/uucode ns/op | RegExp ns/op | Ratio |
 |---|---:|---:|---:|
 | `isUpper` | 12.24 | 18.48 | 1.51x |
 | `isLower` | 11.00 | 18.36 | 1.67x |
@@ -232,7 +232,7 @@ expressions on a rotating mixed code point corpus:
 Generated binary property APIs are benchmarked against matching Unicode property
 regular expressions on a property-focused code point corpus:
 
-| Binary property benchmark | uucode-ts ns/op | RegExp ns/op | Ratio |
+| Binary property benchmark | @rockorager/uucode ns/op | RegExp ns/op | Ratio |
 |---|---:|---:|---:|
 | `isASCIIHexDigit` | 6.76 | 14.20 | 2.10x |
 | `isHexDigit` | 16.56 | 14.48 | 0.87x |
@@ -248,7 +248,7 @@ regular expressions on a property-focused code point corpus:
 Simple case mapping APIs are benchmarked against JavaScript string casing where
 there is a close native comparison:
 
-| Case mapping benchmark | uucode-ts ns/op | Native ns/op | Ratio |
+| Case mapping benchmark | @rockorager/uucode ns/op | Native ns/op | Ratio |
 |---|---:|---:|---:|
 | `toUpper` | 8.56 | 18.20 | 2.13x |
 | `toLower` | 8.24 | 13.76 | 1.67x |
@@ -258,13 +258,13 @@ there is a close native comparison:
 String case folding is benchmarked against precompiled Unicode ignore-case
 regular expressions:
 
-| EqualFold benchmark | uucode-ts ns/op | RegExp ns/op | Ratio |
+| EqualFold benchmark | @rockorager/uucode ns/op | RegExp ns/op | Ratio |
 |---|---:|---:|---:|
 | `equalFold` | 17.80 | 15.68 | 0.88x |
 
 Terminal width is benchmarked against `string-width` and `wcwidth`:
 
-| Width benchmark | uucode-ts ns/op | string-width ns/op | wcwidth ns/op |
+| Width benchmark | @rockorager/uucode ns/op | string-width ns/op | wcwidth ns/op |
 |---|---:|---:|---:|
 | ASCII | 44.5 | 39.3 | 77.7 |
 | Combining | 42.0 | 9419.9 | 269.4 |
