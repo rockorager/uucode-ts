@@ -1,0 +1,7 @@
+node_modules/
+dist/
+src/generated/tables.ts
+src/generated/tables.json
+src/generated/runtime_width.ts
+src/generated/runtime_width.json
+*.tgz

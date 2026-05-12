@@ -1,0 +1,63 @@
+{
+  "name": "uucode-ts",
+  "version": "0.0.0",
+  "description": "TypeScript port of uucode Unicode property tables and iterators",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    },
+    "./width": {
+      "types": "./dist/src/width.d.ts",
+      "import": "./dist/src/width.js"
+    },
+    "./grapheme": {
+      "types": "./dist/src/grapheme.d.ts",
+      "import": "./dist/src/grapheme.js"
+    },
+    "./properties": {
+      "types": "./dist/src/get.d.ts",
+      "import": "./dist/src/get.js"
+    },
+    "./ascii": {
+      "types": "./dist/src/ascii.d.ts",
+      "import": "./dist/src/ascii.js"
+    }
+  },
+  "files": [
+    "dist/src",
+    "ucd",
+    "licenses",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "generate": "tsx scripts/generate.ts",
+    "build": "rm -rf dist && npm run generate && tsc -p tsconfig.json && cp src/generated/tables.json dist/src/generated/tables.json && cp src/generated/runtime_width.json dist/src/generated/runtime_width.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "format": "oxfmt --write 'src/**/*.ts' 'scripts/**/*.ts' 'test/**/*.ts' 'benchmark/**/*.ts'",
+    "format:check": "oxfmt --check 'src/**/*.ts' 'scripts/**/*.ts' 'test/**/*.ts' 'benchmark/**/*.ts'",
+    "lint": "oxlint src scripts test benchmark --ignore-pattern 'src/generated/**' --deny-warnings -D suspicious -D perf",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "benchmark": "npm run build && node dist/benchmark/native-props.js",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "unicode",
+    "grapheme",
+    "wcwidth",
+    "typescript"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.15.17",
+    "oxfmt": "^0.49.0",
+    "oxlint": "^1.64.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}
