@@ -1,31 +1,43 @@
 # @rockorager/uucode
 
-TypeScript port of [`jacobsandlund/uucode`](https://github.com/jacobsandlund/uucode).
+`@rockorager/uucode` is a small TypeScript Unicode segmentation, width, and
+property package inspired by Jacob Sandlund's excellent
+[`uucode`](https://github.com/jacobsandlund/uucode). Jacob's Zig implementation
+does the hard architectural work here: generated Unicode tables, compact
+property rows, and fast lookup strategies. This package ports that table-first
+approach to TypeScript.
 
-The package has no runtime dependencies. Unicode tables are generated from the
-checked-in Unicode Character Database files during `npm run build`.
+It provides:
+
+- extended grapheme cluster iteration over JavaScript strings
+- grapheme-aware terminal cell width with `stringWidth`
+- narrow lookup APIs for generated Unicode category, break, binary, emoji, width, and case properties
+- no runtime UCD parser, cache, or fallback path
+
+## Usage
 
 ```ts
 import {
   equalFold,
   generalCategory,
   graphemes,
-  isEmojiPresentation,
+  isLetter,
+  lineBreak,
   stringWidth,
   toUpper,
+  wordBreak,
 } from "@rockorager/uucode";
 
-generalCategory(0x2200); // "symbol_math"
-isEmojiPresentation(0x1f600); // true
-toUpper(0x00b5); // 0x039c
-equalFold("K", "\u212a"); // true
-stringWidth("ò👨🏻‍❤️‍👨🏿_"); // 4
+const s = "👩🏽‍🚀🇨🇭A\u0300";
 
-for (const segment of graphemes("👩🏽‍🚀🇨🇭")) {
-  console.log(segment);
-  // { segment: "👩🏽‍🚀", start: 0, end: 7 }
-  // { segment: "🇨🇭", start: 7, end: 11 }
+for (const g of graphemes(s)) {
+  console.log(JSON.stringify(g.segment), `[${g.start}:${g.end}]`);
 }
+
+console.log(stringWidth("ò👨🏻‍❤️‍👨🏿_"));
+console.log(isLetter(0x754c), wordBreak(0x41), lineBreak(0x20));
+console.log(toUpper(0x00b5), equalFold("K", "\u212a"));
+console.log(generalCategory(0x2200));
 ```
 
 Focused entry points are also available:
@@ -37,172 +49,34 @@ import { isUpper } from "@rockorager/uucode/properties";
 import { stringWidth } from "@rockorager/uucode/width";
 ```
 
-## Public API
-
 Most functions that accept a code point take a JavaScript `number` in the range
 `0x0000..0x10ffff`. Invalid code points throw `RangeError`.
 
-### Root
+## Public API
 
-The root module exports the commonly used Unicode helpers:
+The root module exports the common helpers: `graphemes`, `graphemesNoControl`,
+`stringWidth`, `codePointWidth`, property lookups such as `generalCategory`,
+`eastAsianWidth`, `wordBreak`, `sentenceBreak`, `lineBreak`, and
+`graphemeBreakProperty`, case helpers such as `toUpper`, `toLower`, `toTitle`,
+`simpleFold`, and `equalFold`, plus Go-style predicates such as `isLetter`,
+`isDigit`, `isSpace`, `isEmojiPresentation`, and `isExtendedPictographic`.
 
-```ts
-import {
-  codePointWidth,
-  eastAsianWidth,
-  equalFold,
-  generalCategory,
-  graphemeBreakProperty,
-  graphemes,
-  graphemesNoControl,
-  isLetter,
-  isSpace,
-  lineBreak,
-  sentenceBreak,
-  simpleFold,
-  stringWidth,
-  toLower,
-  toTitle,
-  toUpper,
-  wordBreak,
-} from "@rockorager/uucode";
-```
+The `@rockorager/uucode/properties` entry point exposes the full property helper
+surface, including binary PropList predicates: `isASCIIHexDigit`, `isHexDigit`,
+`isDash`, `isDiacritic`, `isQuotationMark`, `isPatternSyntax`,
+`isPatternWhiteSpace`, `isVariationSelector`, `isNoncharacter`, and
+`isUnifiedIdeograph`.
 
-### Properties
-
-`@rockorager/uucode/properties` exposes code point property lookups, case mappings, and
-predicate helpers.
-
-```ts
-import {
-  eastAsianWidth,
-  generalCategory,
-  graphemeBreakProperty,
-  isDigit,
-  isEmojiPresentation,
-  isLetter,
-  isPunct,
-  isSpace,
-  toLower,
-} from "@rockorager/uucode/properties";
-
-generalCategory(0x41); // "letter_uppercase"
-eastAsianWidth(0xff01); // "fullwidth"
-graphemeBreakProperty(0x200d); // "zwj"
-isLetter(0x754c); // true
-isSpace(0x00a0); // true
-toLower(0x0130); // 0x0069
-```
-
-Property lookups:
-
-| Function | Returns |
-|---|---|
-| `generalCategory(cp)` | Unicode general category |
-| `eastAsianWidth(cp)` | East Asian Width |
-| `wordBreak(cp)` | Word break property |
-| `sentenceBreak(cp)` | Sentence break property |
-| `lineBreak(cp)` | Line break property |
-| `graphemeBreakProperty(cp)` | Grapheme break property |
-
-Case helpers:
-
-| Function | Behavior |
-|---|---|
-| `toUpper(cp)` | Simple uppercase mapping |
-| `toLower(cp)` | Simple lowercase mapping |
-| `toTitle(cp)` | Simple titlecase mapping |
-| `simpleFold(cp)` | Next code point in the Unicode simple-fold cycle |
-| `equalFold(a, b)` | String equality under Unicode simple case folding |
-
-Predicate helpers:
-
-```ts
-isUpper(cp);
-isLower(cp);
-isTitle(cp);
-isLetter(cp);
-isNumber(cp);
-isDigit(cp);
-isMark(cp);
-isPunct(cp);
-isSymbol(cp);
-isGraphic(cp);
-isPrint(cp);
-isControl(cp);
-isSpace(cp);
-isASCIIHexDigit(cp);
-isHexDigit(cp);
-isDash(cp);
-isDiacritic(cp);
-isQuotationMark(cp);
-isPatternSyntax(cp);
-isPatternWhiteSpace(cp);
-isVariationSelector(cp);
-isNoncharacter(cp);
-isUnifiedIdeograph(cp);
-isEmojiPresentation(cp);
-isExtendedPictographic(cp);
-```
-
-### Graphemes
-
-`@rockorager/uucode/grapheme` exposes iterators over extended grapheme clusters.
-
-```ts
-import { GraphemeIterator, graphemes } from "@rockorager/uucode/grapheme";
-
-for (const item of graphemes("A\u0300🇨🇭")) {
-  item.segment;
-  item.start;
-  item.end;
-}
-
-const it = new GraphemeIterator("👩🏽‍🚀🇨🇭");
-it.peekSegment(); // does not advance
-it.nextSegment(); // advances
-it.clone(); // copies iterator state
-```
-
-`graphemesNoControl(input)` and `GraphemeIteratorNoControl` use the same API but
-ignore control-code grapheme breaks.
-
-### Width
-
-`@rockorager/uucode/width` exposes terminal cell-width helpers:
-
-```ts
-import { codePointWidth, stringWidth } from "@rockorager/uucode/width";
-
-codePointWidth(0x3000); // 2
-stringWidth("A\u0300👩🏽‍🚀"); // 3
-```
-
-`codePointWidth(cp)` returns the standalone width of a single code point.
-`stringWidth(input)` computes grapheme-aware string width.
-
-### ASCII
-
-`@rockorager/uucode/ascii` exposes small ASCII-only helpers:
-
-```ts
-import { isAlphanumeric, isHex, toLower, toUpper } from "@rockorager/uucode/ascii";
-
-isAlphanumeric(0x41); // true
-isHex(0x66); // true
-toUpper(0x61); // 0x41
-toLower(0x41); // 0x61
-```
-
-Available ASCII helpers are `isAscii`, `isAlphanumeric`, `isAlphabetic`,
-`isControl`, `isDigit`, `isHex`, `isLower`, `isPrint`, `isUpper`,
-`isWhitespace`, `toLower`, and `toUpper`.
+The `@rockorager/uucode/grapheme` entry point exposes `GraphemeIterator`,
+`GraphemeIteratorNoControl`, `graphemes`, and `graphemesNoControl`. Iterators
+return `{ segment, start, end }`, where offsets are JavaScript string indexes.
 
 ## Benchmarks
 
 Benchmarks below were run on an Apple M4 Max with Node.js 22.19.0. Each row is
 based on `npm run benchmark`; lower `ns/op` is better. The ratio column is
-`baseline / @rockorager/uucode`, so values above `1.00x` mean `@rockorager/uucode` is faster.
+`baseline / @rockorager/uucode`, so values above `1.00x` mean
+`@rockorager/uucode` is faster.
 
 General category lookup has no direct native equivalent:
 
@@ -277,6 +151,26 @@ Run the package benchmarks:
 npm run benchmark
 ```
 
+## Generated Tables
+
+The package ships Unicode 17 source files and generates JSON-backed runtime
+tables. Width hot paths use three stages:
+
+- `stage1` indexes 256-code-point blocks by `cp >> 8`
+- `stage2` indexes the low byte within deduplicated blocks
+- `stage3` stores deduplicated packed grapheme and width rows
+
+Regenerate after changing UCD files or generator logic:
+
+```sh
+npm run generate
+```
+
+The generated tables store property ranges, sparse mapping tables, packed width
+rows, grapheme segmentation data, word/sentence/line break properties, East
+Asian Width, PropList binary properties, simple case mapping, simple case
+folding, and emoji properties used by the public lookup functions.
+
 ## Development
 
 ```sh
@@ -284,3 +178,10 @@ npm install
 npm test
 npm run benchmark
 ```
+
+## Attribution
+
+The design is based on the real
+[`jacobsandlund/uucode`](https://github.com/jacobsandlund/uucode). If you are
+interested in the original implementation, Unicode table generation strategy,
+or a Zig library for this problem space, start there.
