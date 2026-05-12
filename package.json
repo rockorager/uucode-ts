@@ -29,7 +29,6 @@
   },
   "files": [
     "dist/src",
-    "ucd",
     "licenses",
     "LICENSE.md",
     "README.md"
