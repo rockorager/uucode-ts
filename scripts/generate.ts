@@ -259,9 +259,9 @@ const numericValueDigit = fill<number | null>(null);
 const numericValueNumeric = fill("");
 const isBidiMirrored = fill(false);
 const unicode1Name = fill("");
-const simpleUppercaseMapping = fill(0);
-const simpleLowercaseMapping = fill(0);
-const simpleTitlecaseMapping = fill(0);
+const simpleUppercaseMapping = Array.from({ length: COUNT }, (_, cp) => cp);
+const simpleLowercaseMapping = Array.from({ length: COUNT }, (_, cp) => cp);
+const simpleTitlecaseMapping = Array.from({ length: COUNT }, (_, cp) => cp);
 
 let unicodeRangeStart: string[] | undefined;
 for (const line of readLines("UnicodeData.txt")) {
