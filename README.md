@@ -50,25 +50,7 @@ import { stringWidth } from "@rockorager/uucode/width";
 ```
 
 Most functions that accept a code point take a JavaScript `number` in the range
-`0x0000..0x10ffff`. Invalid code points throw `RangeError`.
-
-## Public API
-
-The root module exports the common helpers: `graphemes`, `graphemesNoControl`,
-`stringWidth`, `codePointWidth`, property lookups such as `generalCategory`,
-`eastAsianWidth`, `wordBreak`, `sentenceBreak`, `lineBreak`, and
-`graphemeBreakProperty`, case helpers such as `toUpper`, `toLower`, `toTitle`,
-`simpleFold`, and `equalFold`, plus Go-style predicates such as `isLetter`,
-`isDigit`, `isSpace`, `isEmojiPresentation`, and `isExtendedPictographic`.
-
-The `@rockorager/uucode/properties` entry point exposes the full property helper
-surface, including binary PropList predicates: `isASCIIHexDigit`, `isHexDigit`,
-`isDash`, `isDiacritic`, `isQuotationMark`, `isPatternSyntax`,
-`isPatternWhiteSpace`, `isVariationSelector`, `isNoncharacter`, and
-`isUnifiedIdeograph`.
-
-The `@rockorager/uucode/grapheme` entry point exposes `GraphemeIterator`,
-`GraphemeIteratorNoControl`, `graphemes`, and `graphemesNoControl`. Iterators
+`0x0000..0x10ffff`. Invalid code points throw `RangeError`. Grapheme iterators
 return `{ segment, start, end }`, where offsets are JavaScript string indexes.
 
 ## Benchmarks
@@ -77,6 +59,15 @@ Benchmarks below were run on an Apple M4 Max with Node.js 22.19.0. Each row is
 based on `npm run benchmark`; lower `ns/op` is better. The ratio column is
 `baseline / @rockorager/uucode`, so values above `1.00x` mean
 `@rockorager/uucode` is faster.
+
+Terminal width is benchmarked against `string-width` and `wcwidth`:
+
+| Width benchmark | @rockorager/uucode ns/op | string-width ns/op | wcwidth ns/op |
+|---|---:|---:|---:|
+| ASCII | 44.5 | 39.3 | 77.7 |
+| Combining | 42.0 | 9419.9 | 269.4 |
+| Emoji | 265.5 | 14819.8 | 930.4 |
+| Mixed | 337.1 | 13429.5 | 515.5 |
 
 General category lookup has no direct native equivalent:
 
@@ -135,15 +126,6 @@ regular expressions:
 | EqualFold benchmark | @rockorager/uucode ns/op | RegExp ns/op | Ratio |
 |---|---:|---:|---:|
 | `equalFold` | 17.80 | 15.68 | 0.88x |
-
-Terminal width is benchmarked against `string-width` and `wcwidth`:
-
-| Width benchmark | @rockorager/uucode ns/op | string-width ns/op | wcwidth ns/op |
-|---|---:|---:|---:|
-| ASCII | 44.5 | 39.3 | 77.7 |
-| Combining | 42.0 | 9419.9 | 269.4 |
-| Emoji | 265.5 | 14819.8 | 930.4 |
-| Mixed | 337.1 | 13429.5 | 515.5 |
 
 Run the package benchmarks:
 
