@@ -59,7 +59,7 @@ VerticalOrientation.txt
 auxiliary/GraphemeBreakTest.html
 # auxiliary/GraphemeBreakTest.txt
 auxiliary/LineBreakTest.html
-auxiliary/LineBreakTest.txt
+# auxiliary/LineBreakTest.txt
 auxiliary/SentenceBreakProperty.txt
 auxiliary/SentenceBreakTest.html
 auxiliary/SentenceBreakTest.txt

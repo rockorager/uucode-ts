@@ -1,4 +1,10 @@
-import { generalCategoryIDs, graphemeBreakIDs, runtimeProps } from "./generated/runtime_props.js";
+import {
+  eastAsianWidthIDs,
+  generalCategoryIDs,
+  graphemeBreakIDs,
+  lineBreakIDs,
+  runtimeProps,
+} from "./generated/runtime_props.js";
 
 export const MAX_CODE_POINT = runtimeProps.maxCodePoint;
 
@@ -46,10 +52,66 @@ export const GC_PUNCTUATION_CLOSE = generalCategoryIDs.punctuation_close;
 export const GC_PUNCTUATION_INITIAL_QUOTE = generalCategoryIDs.punctuation_initial_quote;
 export const GC_PUNCTUATION_FINAL_QUOTE = generalCategoryIDs.punctuation_final_quote;
 export const GC_PUNCTUATION_OTHER = generalCategoryIDs.punctuation_other;
+export const GC_OTHER_NOT_ASSIGNED = generalCategoryIDs.other_not_assigned;
 export const GC_SYMBOL_MATH = generalCategoryIDs.symbol_math;
 export const GC_SYMBOL_CURRENCY = generalCategoryIDs.symbol_currency;
 export const GC_SYMBOL_MODIFIER = generalCategoryIDs.symbol_modifier;
 export const GC_SYMBOL_OTHER = generalCategoryIDs.symbol_other;
+
+export const EAW_FULLWIDTH = eastAsianWidthIDs.fullwidth;
+export const EAW_WIDE = eastAsianWidthIDs.wide;
+export const EAW_HALFWIDTH = eastAsianWidthIDs.halfwidth;
+export const EAW_NARROW = eastAsianWidthIDs.narrow;
+
+export const LB_XX = lineBreakIDs.xx;
+export const LB_AI = lineBreakIDs.ai;
+export const LB_AK = lineBreakIDs.ak;
+export const LB_AL = lineBreakIDs.al;
+export const LB_AP = lineBreakIDs.ap;
+export const LB_AS = lineBreakIDs.as;
+export const LB_B2 = lineBreakIDs.b2;
+export const LB_BA = lineBreakIDs.ba;
+export const LB_BB = lineBreakIDs.bb;
+export const LB_BK = lineBreakIDs.bk;
+export const LB_CB = lineBreakIDs.cb;
+export const LB_CJ = lineBreakIDs.cj;
+export const LB_CL = lineBreakIDs.cl;
+export const LB_CM = lineBreakIDs.cm;
+export const LB_CP = lineBreakIDs.cp;
+export const LB_CR = lineBreakIDs.cr;
+export const LB_EB = lineBreakIDs.eb;
+export const LB_EM = lineBreakIDs.em;
+export const LB_EX = lineBreakIDs.ex;
+export const LB_GL = lineBreakIDs.gl;
+export const LB_H2 = lineBreakIDs.h2;
+export const LB_H3 = lineBreakIDs.h3;
+export const LB_HH = lineBreakIDs.hh;
+export const LB_HL = lineBreakIDs.hl;
+export const LB_HY = lineBreakIDs.hy;
+export const LB_ID = lineBreakIDs.id;
+export const LB_IN = lineBreakIDs.in;
+export const LB_IS = lineBreakIDs.is;
+export const LB_JL = lineBreakIDs.jl;
+export const LB_JT = lineBreakIDs.jt;
+export const LB_JV = lineBreakIDs.jv;
+export const LB_LF = lineBreakIDs.lf;
+export const LB_NL = lineBreakIDs.nl;
+export const LB_NS = lineBreakIDs.ns;
+export const LB_NU = lineBreakIDs.nu;
+export const LB_OP = lineBreakIDs.op;
+export const LB_PO = lineBreakIDs.po;
+export const LB_PR = lineBreakIDs.pr;
+export const LB_QU = lineBreakIDs.qu;
+export const LB_RI = lineBreakIDs.ri;
+export const LB_SA = lineBreakIDs.sa;
+export const LB_SG = lineBreakIDs.sg;
+export const LB_SP = lineBreakIDs.sp;
+export const LB_SY = lineBreakIDs.sy;
+export const LB_VF = lineBreakIDs.vf;
+export const LB_VI = lineBreakIDs.vi;
+export const LB_WJ = lineBreakIDs.wj;
+export const LB_ZW = lineBreakIDs.zw;
+export const LB_ZWJ = lineBreakIDs.zwj;
 
 export const BREAK_STATE_DEFAULT = 0;
 export const BREAK_STATE_REGIONAL_INDICATOR = 1;

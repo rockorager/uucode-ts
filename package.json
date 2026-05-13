@@ -18,6 +18,10 @@
       "types": "./dist/src/grapheme.d.ts",
       "import": "./dist/src/grapheme.js"
     },
+    "./linebreak": {
+      "types": "./dist/src/linebreak.d.ts",
+      "import": "./dist/src/linebreak.js"
+    },
     "./properties": {
       "types": "./dist/src/properties.d.ts",
       "import": "./dist/src/properties.js"

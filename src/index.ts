@@ -55,3 +55,5 @@ export {
   graphemes,
   graphemesNoControl,
 } from "./grapheme.js";
+export type { LineBreakKind, LineSegment } from "./linebreak.js";
+export { LineIterator, lineSegments } from "./linebreak.js";

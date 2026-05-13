@@ -28,6 +28,7 @@ import {
   isTitle,
   isUnifiedIdeograph,
   stringWidth,
+  lineSegments,
   simpleFold,
   toLower,
   toTitle,
@@ -180,6 +181,77 @@ test("grapheme iterator examples", () => {
   );
 });
 
+test("line iterator examples", () => {
+  for (const { input, want } of [
+    { input: "", want: [] },
+    { input: "hello", want: [{ start: 0, end: 5, break: "must_break" }] },
+    {
+      input: "hello world",
+      want: [
+        { start: 0, end: 6, break: "can_break" },
+        { start: 6, end: 11, break: "must_break" },
+      ],
+    },
+    {
+      input: "a\nb",
+      want: [
+        { start: 0, end: 2, break: "must_break" },
+        { start: 2, end: 3, break: "must_break" },
+      ],
+    },
+    {
+      input: "a\r\nb",
+      want: [
+        { start: 0, end: 3, break: "must_break" },
+        { start: 3, end: 4, break: "must_break" },
+      ],
+    },
+    { input: "A.B", want: [{ start: 0, end: 3, break: "must_break" }] },
+    {
+      input: "👩‍🚀x",
+      want: [
+        { start: 0, end: "👩‍🚀".length, break: "can_break" },
+        { start: "👩‍🚀".length, end: "👩‍🚀x".length, break: "must_break" },
+      ],
+    },
+  ] as const) {
+    assert.deepEqual([...lineSegments(input)], want, input);
+  }
+
+  const it = lineSegments("hello world");
+  assert.deepEqual(it.peekSegment(), { start: 0, end: 6, break: "can_break" });
+  assert.deepEqual(it.nextSegment(), { start: 0, end: 6, break: "can_break" });
+  assert.deepEqual(it.nextSegment(), { start: 6, end: 11, break: "must_break" });
+  assert.equal(it.nextSegment(), null);
+});
+
+test("line break test data", () => {
+  const lines = readFileSync("ucd/auxiliary/LineBreakTest.txt", "utf8").split(/\r?\n/);
+  for (const [lineIndex, line] of lines.entries()) {
+    const body = line.split("#", 1)[0]!.trim();
+    if (!body) continue;
+
+    const tokens = body.split(/\s+/);
+    let input = "";
+    let offset = 0;
+    const expectedEnds: number[] = [];
+
+    for (let i = 1; i < tokens.length; i += 2) {
+      const hex = tokens[i];
+      const marker = tokens[i + 1];
+      if (!hex || !marker) break;
+      const cp = Number.parseInt(hex, 16);
+      const char = codePointToString(cp);
+      input += char;
+      offset += char.length;
+      if (marker === "÷") expectedEnds.push(offset);
+    }
+
+    const actualEnds = [...lineSegments(input)].map((segment) => segment.end);
+    assert.deepEqual(actualEnds, expectedEnds, `line ${lineIndex + 1}: ${line}`);
+  }
+});
+
 test("grapheme break test data", () => {
   const lines = readFileSync("ucd/auxiliary/GraphemeBreakTest.txt", "utf8").split(/\r?\n/);
   for (const [lineIndex, line] of lines.entries()) {
@@ -208,6 +280,10 @@ test("grapheme break test data", () => {
     }
   }
 });
+
+function codePointToString(cp: number): string {
+  return cp >= 0xd800 && cp <= 0xdfff ? String.fromCharCode(cp) : String.fromCodePoint(cp);
+}
 
 test("grapheme break no control test data", () => {
   const lines = readFileSync("ucd/auxiliary/GraphemeBreakTest.txt", "utf8").split(/\r?\n/);

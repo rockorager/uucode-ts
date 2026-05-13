@@ -10,6 +10,7 @@ approach to TypeScript.
 It provides:
 
 - extended grapheme cluster iteration over JavaScript strings
+- UAX #14 line break opportunity iteration over JavaScript strings
 - grapheme-aware terminal cell width with `stringWidth`
 - narrow lookup APIs for generated Unicode category, break, binary, emoji, width, and case properties
 - no runtime UCD parser, cache, or fallback path
@@ -23,6 +24,7 @@ import {
   graphemes,
   isLetter,
   lineBreak,
+  lineSegments,
   stringWidth,
   toUpper,
   wordBreak,
@@ -32,6 +34,10 @@ const s = "👩🏽‍🚀🇨🇭A\u0300";
 
 for (const g of graphemes(s)) {
   console.log(JSON.stringify(g.segment), `[${g.start}:${g.end}]`);
+}
+
+for (const seg of lineSegments("hello world")) {
+  console.log(JSON.stringify("hello world".slice(seg.start, seg.end)), seg.break);
 }
 
 console.log(stringWidth("ò👨🏻‍❤️‍👨🏿_"));
@@ -45,6 +51,7 @@ Focused entry points are also available:
 ```ts
 import * as ascii from "@rockorager/uucode/ascii";
 import { graphemes } from "@rockorager/uucode/grapheme";
+import { lineSegments } from "@rockorager/uucode/linebreak";
 import { isUpper } from "@rockorager/uucode/properties";
 import { stringWidth } from "@rockorager/uucode/width";
 ```
