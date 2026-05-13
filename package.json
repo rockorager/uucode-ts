@@ -1,6 +1,6 @@
 {
   "name": "@rockorager/uucode",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "description": "TypeScript port of uucode Unicode property tables and iterators",
   "type": "module",
   "main": "./dist/src/index.js",
