@@ -1,4 +1,31 @@
-import { get } from "./get.js";
+import {
+  BREAK_STATE_DEFAULT,
+  BREAK_STATE_EXTENDED_PICTOGRAPHIC,
+  BREAK_STATE_INDIC_CONJUNCT_CONSONANT,
+  BREAK_STATE_INDIC_CONJUNCT_LINKER,
+  BREAK_STATE_REGIONAL_INDICATOR,
+  GB_CONTROL,
+  GB_CR,
+  GB_EMOJI_MODIFIER,
+  GB_EMOJI_MODIFIER_BASE,
+  GB_EXTENDED_PICTOGRAPHIC,
+  GB_INDIC_CONJUNCT_CONSONANT,
+  GB_INDIC_CONJUNCT_EXTEND,
+  GB_INDIC_CONJUNCT_LINKER,
+  GB_L,
+  GB_LF,
+  GB_LV,
+  GB_LVT,
+  GB_OTHER,
+  GB_PREPEND,
+  GB_REGIONAL_INDICATOR,
+  GB_SPACING_MARK,
+  GB_T,
+  GB_V,
+  GB_ZWJ,
+  GB_ZWNJ,
+  graphemeBreakCode,
+} from "./runtime.js";
 
 export type GraphemeBreak =
   | "other"
@@ -35,18 +62,202 @@ export type CodePointBreak = {
 };
 export type GraphemeSegment = { segment: string; start: number; end: number };
 
-function isIndicConjunctBreakExtend(gb: GraphemeBreak): boolean {
-  return gb === "indic_conjunct_break_extend" || gb === "zwj";
+function graphemeBreakToCode(gb: GraphemeBreak): number {
+  switch (gb) {
+    case "control":
+      return GB_CONTROL;
+    case "prepend":
+      return GB_PREPEND;
+    case "cr":
+      return GB_CR;
+    case "lf":
+      return GB_LF;
+    case "regional_indicator":
+      return GB_REGIONAL_INDICATOR;
+    case "spacing_mark":
+      return GB_SPACING_MARK;
+    case "l":
+      return GB_L;
+    case "v":
+      return GB_V;
+    case "t":
+      return GB_T;
+    case "lv":
+      return GB_LV;
+    case "lvt":
+      return GB_LVT;
+    case "zwj":
+      return GB_ZWJ;
+    case "zwnj":
+      return GB_ZWNJ;
+    case "extended_pictographic":
+      return GB_EXTENDED_PICTOGRAPHIC;
+    case "emoji_modifier_base":
+      return GB_EMOJI_MODIFIER_BASE;
+    case "emoji_modifier":
+      return GB_EMOJI_MODIFIER;
+    case "indic_conjunct_break_extend":
+      return GB_INDIC_CONJUNCT_EXTEND;
+    case "indic_conjunct_break_linker":
+      return GB_INDIC_CONJUNCT_LINKER;
+    case "indic_conjunct_break_consonant":
+      return GB_INDIC_CONJUNCT_CONSONANT;
+    default:
+      return GB_OTHER;
+  }
 }
 
-function isExtend(gb: GraphemeBreak): boolean {
+function breakStateToCode(state: BreakState): number {
+  switch (state) {
+    case "regional_indicator":
+      return BREAK_STATE_REGIONAL_INDICATOR;
+    case "extended_pictographic":
+      return BREAK_STATE_EXTENDED_PICTOGRAPHIC;
+    case "indic_conjunct_break_consonant":
+      return BREAK_STATE_INDIC_CONJUNCT_CONSONANT;
+    case "indic_conjunct_break_linker":
+      return BREAK_STATE_INDIC_CONJUNCT_LINKER;
+    default:
+      return BREAK_STATE_DEFAULT;
+  }
+}
+
+function breakStateFromCode(state: number): BreakState {
+  switch (state) {
+    case BREAK_STATE_REGIONAL_INDICATOR:
+      return "regional_indicator";
+    case BREAK_STATE_EXTENDED_PICTOGRAPHIC:
+      return "extended_pictographic";
+    case BREAK_STATE_INDIC_CONJUNCT_CONSONANT:
+      return "indic_conjunct_break_consonant";
+    case BREAK_STATE_INDIC_CONJUNCT_LINKER:
+      return "indic_conjunct_break_linker";
+    default:
+      return "default";
+  }
+}
+
+function isIndicConjunctBreakExtendCode(gb: number): boolean {
+  return gb === GB_INDIC_CONJUNCT_EXTEND || gb === GB_ZWJ;
+}
+
+function isExtendCode(gb: number): boolean {
+  return gb === GB_ZWNJ || gb === GB_INDIC_CONJUNCT_EXTEND || gb === GB_INDIC_CONJUNCT_LINKER;
+}
+
+function isExtendedPictographicCode(gb: number): boolean {
+  return gb === GB_EXTENDED_PICTOGRAPHIC || gb === GB_EMOJI_MODIFIER_BASE;
+}
+
+function canContinueExtendedPictographicState(gb: number): boolean {
   return (
-    gb === "zwnj" || gb === "indic_conjunct_break_extend" || gb === "indic_conjunct_break_linker"
+    gb === GB_INDIC_CONJUNCT_EXTEND ||
+    gb === GB_INDIC_CONJUNCT_LINKER ||
+    gb === GB_ZWNJ ||
+    gb === GB_ZWJ ||
+    gb === GB_EXTENDED_PICTOGRAPHIC ||
+    gb === GB_EMOJI_MODIFIER_BASE ||
+    gb === GB_EMOJI_MODIFIER
   );
 }
 
-function isExtendedPictographic(gb: GraphemeBreak): boolean {
-  return gb === "extended_pictographic" || gb === "emoji_modifier_base";
+function canContinueIndicConjunctState(gb: number): boolean {
+  return (
+    gb === GB_INDIC_CONJUNCT_CONSONANT ||
+    gb === GB_INDIC_CONJUNCT_LINKER ||
+    gb === GB_INDIC_CONJUNCT_EXTEND ||
+    gb === GB_ZWJ
+  );
+}
+
+function computeGraphemeBreakCode(gb1: number, gb2: number, stateRef: { value: number }): boolean {
+  switch (stateRef.value) {
+    case BREAK_STATE_REGIONAL_INDICATOR:
+      if (gb1 !== GB_REGIONAL_INDICATOR || gb2 !== GB_REGIONAL_INDICATOR) {
+        stateRef.value = BREAK_STATE_DEFAULT;
+      }
+      break;
+    case BREAK_STATE_EXTENDED_PICTOGRAPHIC:
+      if (
+        !canContinueExtendedPictographicState(gb1) ||
+        !canContinueExtendedPictographicState(gb2)
+      ) {
+        stateRef.value = BREAK_STATE_DEFAULT;
+      }
+      break;
+    case BREAK_STATE_INDIC_CONJUNCT_CONSONANT:
+    case BREAK_STATE_INDIC_CONJUNCT_LINKER:
+      if (!canContinueIndicConjunctState(gb1) || !canContinueIndicConjunctState(gb2)) {
+        stateRef.value = BREAK_STATE_DEFAULT;
+      }
+      break;
+  }
+
+  if (gb1 === GB_CR && gb2 === GB_LF) return false;
+  if (gb1 === GB_CONTROL || gb1 === GB_CR || gb1 === GB_LF) return true;
+  if (gb2 === GB_CONTROL || gb2 === GB_CR || gb2 === GB_LF) return true;
+  if (gb1 === GB_L && (gb2 === GB_L || gb2 === GB_V || gb2 === GB_LV || gb2 === GB_LVT))
+    return false;
+  if ((gb1 === GB_LV || gb1 === GB_V) && (gb2 === GB_V || gb2 === GB_T)) return false;
+  if ((gb1 === GB_LVT || gb1 === GB_T) && gb2 === GB_T) return false;
+  if (gb2 === GB_SPACING_MARK) return false;
+  if (gb1 === GB_PREPEND) return false;
+
+  if (gb1 === GB_INDIC_CONJUNCT_CONSONANT) {
+    if (isIndicConjunctBreakExtendCode(gb2)) {
+      stateRef.value = BREAK_STATE_INDIC_CONJUNCT_CONSONANT;
+      return false;
+    }
+    if (gb2 === GB_INDIC_CONJUNCT_LINKER) {
+      stateRef.value = BREAK_STATE_INDIC_CONJUNCT_LINKER;
+      return false;
+    }
+  } else if (stateRef.value === BREAK_STATE_INDIC_CONJUNCT_CONSONANT) {
+    if (gb2 === GB_INDIC_CONJUNCT_LINKER) {
+      stateRef.value = BREAK_STATE_INDIC_CONJUNCT_LINKER;
+      return false;
+    }
+    if (isIndicConjunctBreakExtendCode(gb2)) return false;
+    stateRef.value = BREAK_STATE_DEFAULT;
+  } else if (stateRef.value === BREAK_STATE_INDIC_CONJUNCT_LINKER) {
+    if (gb2 === GB_INDIC_CONJUNCT_LINKER || isIndicConjunctBreakExtendCode(gb2)) return false;
+    if (gb2 === GB_INDIC_CONJUNCT_CONSONANT) {
+      stateRef.value = BREAK_STATE_DEFAULT;
+      return false;
+    }
+    stateRef.value = BREAK_STATE_DEFAULT;
+  }
+
+  if (isExtendedPictographicCode(gb1)) {
+    if (isExtendCode(gb2) || gb2 === GB_ZWJ) {
+      stateRef.value = BREAK_STATE_EXTENDED_PICTOGRAPHIC;
+      return false;
+    }
+    if (gb1 === GB_EMOJI_MODIFIER_BASE && gb2 === GB_EMOJI_MODIFIER) {
+      stateRef.value = BREAK_STATE_EXTENDED_PICTOGRAPHIC;
+      return false;
+    }
+  } else if (stateRef.value === BREAK_STATE_EXTENDED_PICTOGRAPHIC) {
+    if ((isExtendCode(gb1) || gb1 === GB_EMOJI_MODIFIER) && (isExtendCode(gb2) || gb2 === GB_ZWJ))
+      return false;
+    if (gb1 === GB_ZWJ && isExtendedPictographicCode(gb2)) {
+      stateRef.value = BREAK_STATE_DEFAULT;
+      return false;
+    }
+    stateRef.value = BREAK_STATE_DEFAULT;
+  }
+
+  if (gb1 === GB_REGIONAL_INDICATOR && gb2 === GB_REGIONAL_INDICATOR) {
+    if (stateRef.value === BREAK_STATE_DEFAULT) {
+      stateRef.value = BREAK_STATE_REGIONAL_INDICATOR;
+      return false;
+    }
+    stateRef.value = BREAK_STATE_DEFAULT;
+    return true;
+  }
+
+  if (isExtendCode(gb2) || gb2 === GB_ZWJ) return false;
+  return true;
 }
 
 export function computeGraphemeBreak(
@@ -54,123 +265,18 @@ export function computeGraphemeBreak(
   gb2: GraphemeBreak,
   stateRef: { value: BreakState },
 ): boolean {
-  switch (stateRef.value) {
-    case "regional_indicator":
-      if (gb1 !== "regional_indicator" || gb2 !== "regional_indicator") stateRef.value = "default";
-      break;
-    case "extended_pictographic":
-      if (
-        ![
-          "indic_conjunct_break_extend",
-          "indic_conjunct_break_linker",
-          "zwnj",
-          "zwj",
-          "extended_pictographic",
-          "emoji_modifier_base",
-          "emoji_modifier",
-        ].includes(gb1) ||
-        ![
-          "indic_conjunct_break_extend",
-          "indic_conjunct_break_linker",
-          "zwnj",
-          "zwj",
-          "extended_pictographic",
-          "emoji_modifier_base",
-          "emoji_modifier",
-        ].includes(gb2)
-      ) {
-        stateRef.value = "default";
-      }
-      break;
-    case "indic_conjunct_break_consonant":
-    case "indic_conjunct_break_linker":
-      if (
-        ![
-          "indic_conjunct_break_consonant",
-          "indic_conjunct_break_linker",
-          "indic_conjunct_break_extend",
-          "zwj",
-        ].includes(gb1) ||
-        ![
-          "indic_conjunct_break_consonant",
-          "indic_conjunct_break_linker",
-          "indic_conjunct_break_extend",
-          "zwj",
-        ].includes(gb2)
-      ) {
-        stateRef.value = "default";
-      }
-      break;
-  }
-
-  if (gb1 === "cr" && gb2 === "lf") return false;
-  if (gb1 === "control" || gb1 === "cr" || gb1 === "lf") return true;
-  if (gb2 === "control" || gb2 === "cr" || gb2 === "lf") return true;
-  if (gb1 === "l" && (gb2 === "l" || gb2 === "v" || gb2 === "lv" || gb2 === "lvt")) return false;
-  if ((gb1 === "lv" || gb1 === "v") && (gb2 === "v" || gb2 === "t")) return false;
-  if ((gb1 === "lvt" || gb1 === "t") && gb2 === "t") return false;
-  if (gb2 === "spacing_mark") return false;
-  if (gb1 === "prepend") return false;
-
-  if (gb1 === "indic_conjunct_break_consonant") {
-    if (isIndicConjunctBreakExtend(gb2)) {
-      stateRef.value = "indic_conjunct_break_consonant";
-      return false;
-    }
-    if (gb2 === "indic_conjunct_break_linker") {
-      stateRef.value = "indic_conjunct_break_linker";
-      return false;
-    }
-  } else if (stateRef.value === "indic_conjunct_break_consonant") {
-    if (gb2 === "indic_conjunct_break_linker") {
-      stateRef.value = "indic_conjunct_break_linker";
-      return false;
-    }
-    if (isIndicConjunctBreakExtend(gb2)) return false;
-    stateRef.value = "default";
-  } else if (stateRef.value === "indic_conjunct_break_linker") {
-    if (gb2 === "indic_conjunct_break_linker" || isIndicConjunctBreakExtend(gb2)) return false;
-    if (gb2 === "indic_conjunct_break_consonant") {
-      stateRef.value = "default";
-      return false;
-    }
-    stateRef.value = "default";
-  }
-
-  if (isExtendedPictographic(gb1)) {
-    if (isExtend(gb2) || gb2 === "zwj") {
-      stateRef.value = "extended_pictographic";
-      return false;
-    }
-    if (gb1 === "emoji_modifier_base" && gb2 === "emoji_modifier") {
-      stateRef.value = "extended_pictographic";
-      return false;
-    }
-  } else if (stateRef.value === "extended_pictographic") {
-    if ((isExtend(gb1) || gb1 === "emoji_modifier") && (isExtend(gb2) || gb2 === "zwj"))
-      return false;
-    if (gb1 === "zwj" && isExtendedPictographic(gb2)) {
-      stateRef.value = "default";
-      return false;
-    }
-    stateRef.value = "default";
-  }
-
-  if (gb1 === "regional_indicator" && gb2 === "regional_indicator") {
-    if (stateRef.value === "default") {
-      stateRef.value = "regional_indicator";
-      return false;
-    }
-    stateRef.value = "default";
-    return true;
-  }
-
-  if (isExtend(gb2) || gb2 === "zwj") return false;
-  return true;
+  const state = { value: breakStateToCode(stateRef.value) };
+  const isBreakValue = computeGraphemeBreakCode(
+    graphemeBreakToCode(gb1),
+    graphemeBreakToCode(gb2),
+    state,
+  );
+  stateRef.value = breakStateFromCode(state.value);
+  return isBreakValue;
 }
 
-function toNoControl(gb: GraphemeBreak): GraphemeBreakNoControl {
-  return gb === "control" || gb === "cr" || gb === "lf" ? "other" : gb;
+function toNoControlCode(gb: number): number {
+  return gb === GB_CONTROL || gb === GB_CR || gb === GB_LF ? GB_OTHER : gb;
 }
 
 export function computeGraphemeBreakNoControl(
@@ -182,11 +288,14 @@ export function computeGraphemeBreakNoControl(
 }
 
 export function isBreak(cp1: number, cp2: number, stateRef: { value: BreakState }): boolean {
-  return computeGraphemeBreak(
-    get("grapheme_break", cp1) as GraphemeBreak,
-    get("grapheme_break", cp2) as GraphemeBreak,
-    stateRef,
+  const state = { value: breakStateToCode(stateRef.value) };
+  const isBreakValue = computeGraphemeBreakCode(
+    graphemeBreakCode(cp1),
+    graphemeBreakCode(cp2),
+    state,
   );
+  stateRef.value = breakStateFromCode(state.value);
+  return isBreakValue;
 }
 
 export function isBreakNoControl(
@@ -194,14 +303,22 @@ export function isBreakNoControl(
   cp2: number,
   stateRef: { value: BreakState },
 ): boolean {
-  return computeGraphemeBreakNoControl(
-    toNoControl(get("grapheme_break", cp1) as GraphemeBreak),
-    toNoControl(get("grapheme_break", cp2) as GraphemeBreak),
-    stateRef,
+  const state = { value: breakStateToCode(stateRef.value) };
+  const isBreakValue = computeGraphemeBreakCode(
+    toNoControlCode(graphemeBreakCode(cp1)),
+    toNoControlCode(graphemeBreakCode(cp2)),
+    state,
   );
+  stateRef.value = breakStateFromCode(state.value);
+  return isBreakValue;
 }
 
 type GraphemeBreakField = "grapheme_break" | "grapheme_break_no_control";
+
+function lookupGraphemeBreak(field: GraphemeBreakField, cp: number): number {
+  const gb = graphemeBreakCode(cp);
+  return field === "grapheme_break_no_control" ? toNoControlCode(gb) : gb;
+}
 
 function readStringCodePoint(
   input: string,
@@ -214,21 +331,21 @@ function readStringCodePoint(
 
 class GraphemeIteratorCore implements IterableIterator<GraphemeSegment> {
   private indexValue = 0;
-  private stateValue: BreakState = "default";
+  private stateValue = BREAK_STATE_DEFAULT;
   private input: string;
   private nextCp: number | null;
   private nextIndex: number;
-  private nextGb: GraphemeBreak;
+  private nextGb: number;
   private field: GraphemeBreakField;
 
   constructor(input: string, field: GraphemeBreakField) {
     this.input = input;
     this.indexValue = 0;
-    this.stateValue = "default";
+    this.stateValue = BREAK_STATE_DEFAULT;
     const next = readStringCodePoint(input, 0);
     this.nextCp = next?.codePoint ?? null;
     this.nextIndex = next?.nextIndex ?? 0;
-    this.nextGb = this.nextCp === null ? "other" : (get(field, this.nextCp) as GraphemeBreak);
+    this.nextGb = this.nextCp === null ? GB_OTHER : lookupGraphemeBreak(field, this.nextCp);
     this.field = field;
   }
 
@@ -257,18 +374,10 @@ class GraphemeIteratorCore implements IterableIterator<GraphemeSegment> {
     this.nextCp = next?.codePoint ?? null;
     this.nextIndex = next?.nextIndex ?? this.indexValue;
     if (this.nextCp !== null) {
-      this.nextGb = get(this.field, this.nextCp) as GraphemeBreak;
-      let state = this.stateValue;
-      const stateRef = {
-        get value(): BreakState {
-          return state;
-        },
-        set value(value: BreakState) {
-          state = value;
-        },
-      };
-      const isBreakValue = computeGraphemeBreak(gb1, this.nextGb, stateRef);
-      this.stateValue = state;
+      this.nextGb = lookupGraphemeBreak(this.field, this.nextCp);
+      const stateRef = { value: this.stateValue };
+      const isBreakValue = computeGraphemeBreakCode(gb1, this.nextGb, stateRef);
+      this.stateValue = stateRef.value;
       return { codePoint: cp1, isBreak: isBreakValue };
     }
     return { codePoint: cp1, isBreak: true };

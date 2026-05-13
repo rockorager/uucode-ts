@@ -4,4 +4,6 @@ src/generated/tables.ts
 src/generated/tables.json
 src/generated/runtime_width.ts
 src/generated/runtime_width.json
+src/generated/runtime_props.ts
+src/generated/runtime_props.json
 *.tgz

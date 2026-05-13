@@ -7,9 +7,6 @@ const UCD = join(root, "ucd");
 const MAX = 0x10ffff;
 const COUNT = MAX + 1;
 
-type Range<T> = [start: number, end: number, value: T];
-type Sparse<T> = [codePoint: number, value: T];
-
 const gcMap: Record<string, string> = {
   Lu: "letter_uppercase",
   Ll: "letter_lowercase",
@@ -43,32 +40,6 @@ const gcMap: Record<string, string> = {
   Cn: "other_not_assigned",
 };
 
-const bidiMap: Record<string, string> = {
-  L: "left_to_right",
-  LRE: "left_to_right_embedding",
-  LRO: "left_to_right_override",
-  R: "right_to_left",
-  AL: "right_to_left_arabic",
-  RLE: "right_to_left_embedding",
-  RLO: "right_to_left_override",
-  PDF: "pop_directional_format",
-  EN: "european_number",
-  ES: "european_number_separator",
-  ET: "european_number_terminator",
-  AN: "arabic_number",
-  CS: "common_number_separator",
-  NSM: "nonspacing_mark",
-  BN: "boundary_neutral",
-  B: "paragraph_separator",
-  S: "segment_separator",
-  WS: "whitespace",
-  ON: "other_neutrals",
-  LRI: "left_to_right_isolate",
-  RLI: "right_to_left_isolate",
-  FSI: "first_strong_isolate",
-  PDI: "pop_directional_isolate",
-};
-
 const eastAsianWidthMap: Record<string, string> = {
   N: "neutral",
   F: "fullwidth",
@@ -93,25 +64,6 @@ const originalGraphemeMap: Record<string, string> = {
   LV: "lv",
   LVT: "lvt",
   ZWJ: "zwj",
-};
-
-const decompMap: Record<string, string> = {
-  font: "font",
-  noBreak: "noBreak",
-  initial: "initial",
-  medial: "medial",
-  final: "final",
-  isolated: "isolated",
-  circle: "circle",
-  super: "super",
-  sub: "sub",
-  vertical: "vertical",
-  wide: "wide",
-  narrow: "narrow",
-  small: "small",
-  square: "square",
-  fraction: "fraction",
-  compat: "compat",
 };
 
 const derivedPropNames: Record<string, string> = {
@@ -195,38 +147,6 @@ function setRange<T>(array: T[], start: number, end: number, value: T): void {
   for (let cp = start; cp <= end; cp += 1) array[cp] = value;
 }
 
-function toRanges<T>(array: readonly T[], defaultValue: T): Range<T>[] {
-  const ranges: Range<T>[] = [];
-  let start = 0;
-  let value = array[0] ?? defaultValue;
-  for (let cp = 1; cp <= array.length; cp += 1) {
-    const next = cp === array.length ? undefined : array[cp];
-    if (next !== value) {
-      if (value !== defaultValue) ranges.push([start, cp - 1, value]);
-      start = cp;
-      value = next ?? defaultValue;
-    }
-  }
-  return ranges;
-}
-
-function toSparse<T>(array: readonly T[], defaultValue: T): Sparse<T>[] {
-  const values: Sparse<T>[] = [];
-  for (let cp = 0; cp < array.length; cp += 1) {
-    if (array[cp] !== defaultValue) values.push([cp, array[cp] as T]);
-  }
-  return values;
-}
-
-function toSparseArray<T>(array: readonly T[][]): Sparse<T[]>[] {
-  const values: Sparse<T[]>[] = [];
-  for (let cp = 0; cp < array.length; cp += 1) {
-    const value = array[cp];
-    if (value && value.length > 0) values.push([cp, value]);
-  }
-  return values;
-}
-
 function readLines(path: string): string[] {
   return readFileSync(join(UCD, path), "utf8").split(/\r?\n/);
 }
@@ -243,22 +163,28 @@ function typeAlias(name: string, values: readonly string[]): string {
   return `export type ${name} =\n${literals.map((value) => `  | ${value}`).join("\n")};`;
 }
 
-function arrayValues(values: readonly (readonly string[])[]): string[] {
-  return values.flatMap((value) => value);
+function propertyNames(values: readonly string[], defaultValue: string): string[] {
+  return [defaultValue, ...uniqueSortedValues(values).filter((value) => value !== defaultValue)];
 }
 
-const names = fill("");
+function propertyIDs(names: readonly string[]): Record<string, number> {
+  return Object.fromEntries(names.map((name, index) => [name, index]));
+}
+
+function propertyID(prop: string, value: string, ids: Record<string, number>): number {
+  const id = ids[value];
+  if (id === undefined) throw new Error(`unknown ${prop} property ${JSON.stringify(value)}`);
+  return id;
+}
+
+function generatedIDObject(name: string, ids: Record<string, number>): string {
+  const entries = Object.entries(ids)
+    .map(([key, value]) => `  ${key}: ${value},`)
+    .join("\n");
+  return `export const ${name} = {\n${entries}\n} as const;`;
+}
+
 const generalCategory = fill("other_not_assigned");
-const canonicalCombiningClass = fill(0);
-const bidiClass = fill("left_to_right");
-const decompositionType = fill("default");
-const decompositionMapping = Array.from({ length: COUNT }, () => [] as number[]);
-const numericType = fill("none");
-const numericValueDecimal = fill<number | null>(null);
-const numericValueDigit = fill<number | null>(null);
-const numericValueNumeric = fill("");
-const isBidiMirrored = fill(false);
-const unicode1Name = fill("");
 const simpleUppercaseMapping = Array.from({ length: COUNT }, (_, cp) => cp);
 const simpleLowercaseMapping = Array.from({ length: COUNT }, (_, cp) => cp);
 const simpleTitlecaseMapping = Array.from({ length: COUNT }, (_, cp) => cp);
@@ -277,35 +203,7 @@ for (const line of readLines("UnicodeData.txt")) {
   const end = name.endsWith(", Last>") && unicodeRangeStart ? cp : cp;
   if (unicodeRangeStart && name.endsWith(", Last>")) fields = unicodeRangeStart;
   for (let current = start; current <= end; current += 1) {
-    names[current] = current === cp ? name : "";
     generalCategory[current] = gcMap[fields[2]!] ?? "other_not_assigned";
-    canonicalCombiningClass[current] = Number(fields[3]!);
-    bidiClass[current] = bidiMap[fields[4]!] ?? "left_to_right";
-    const decomposition = fields[5]!;
-    if (decomposition) {
-      const pieces = decomposition.split(/\s+/);
-      if (pieces[0]?.startsWith("<")) {
-        const tag = pieces.shift()!.slice(1, -1);
-        decompositionType[current] = decompMap[tag] ?? normalizeName(tag);
-      } else {
-        decompositionType[current] = "canonical";
-      }
-      decompositionMapping[current] = pieces.map(hex);
-    }
-    if (fields[6]) {
-      numericType[current] = "decimal";
-      numericValueDecimal[current] = Number(fields[6]);
-    }
-    if (fields[7]) {
-      if (numericType[current] === "none") numericType[current] = "digit";
-      numericValueDigit[current] = Number(fields[7]);
-    }
-    if (fields[8]) {
-      if (numericType[current] === "none") numericType[current] = "numeric";
-      numericValueNumeric[current] = fields[8]!;
-    }
-    isBidiMirrored[current] = fields[9] === "Y";
-    unicode1Name[current] = fields[10]!;
     simpleUppercaseMapping[current] = fields[12] ? hex(fields[12]!) : current;
     simpleLowercaseMapping[current] = fields[13] ? hex(fields[13]!) : current;
     simpleTitlecaseMapping[current] = fields[14] ? hex(fields[14]!) : current;
@@ -313,17 +211,7 @@ for (const line of readLines("UnicodeData.txt")) {
   if (name.endsWith(", Last>")) unicodeRangeStart = undefined;
 }
 
-const caseFoldingTurkishOnly = fill<number | null>(null);
-const caseFoldingCommonOnly = fill<number | null>(null);
-const caseFoldingSimpleOnly = fill<number | null>(null);
-const caseFoldingFullOnly = Array.from({ length: COUNT }, () => [] as number[]);
-const caseFoldingSimple = fill(0);
-const caseFoldingFull = Array.from({ length: COUNT }, () => [] as number[]);
 const foldParent = new Map<number, number>();
-for (let cp = 0; cp < COUNT; cp += 1) {
-  caseFoldingSimple[cp] = cp;
-  caseFoldingFull[cp] = [cp];
-}
 
 function foldFind(cp: number): number {
   const parent = foldParent.get(cp);
@@ -351,23 +239,12 @@ for (const line of readLines("CaseFolding.txt")) {
   const cp = hex(fields[0]!);
   const status = fields[1]!;
   const mapping = fields[2]!.split(/\s+/).map(hex);
-  if (status === "T") caseFoldingTurkishOnly[cp] = mapping[0]!;
   if (status === "C") {
-    caseFoldingCommonOnly[cp] = mapping[0]!;
     foldUnion(cp, mapping[0]!);
   }
   if (status === "S") {
-    caseFoldingSimpleOnly[cp] = mapping[0]!;
     foldUnion(cp, mapping[0]!);
   }
-  if (status === "F") caseFoldingFullOnly[cp] = mapping;
-}
-for (let cp = 0; cp < COUNT; cp += 1) {
-  caseFoldingSimple[cp] =
-    caseFoldingSimpleOnly[cp] ?? caseFoldingCommonOnly[cp] ?? caseFoldingTurkishOnly[cp] ?? cp;
-  caseFoldingFull[cp] = caseFoldingFullOnly[cp]!.length
-    ? caseFoldingFullOnly[cp]!
-    : [caseFoldingCommonOnly[cp] ?? cp];
 }
 
 const simpleFold = fill(0);
@@ -391,56 +268,6 @@ for (const group of foldGroups.values()) {
   }
 }
 
-const hasSpecialCasing = fill(false);
-const specialLowercaseMapping = Array.from({ length: COUNT }, () => [] as number[]);
-const specialTitlecaseMapping = Array.from({ length: COUNT }, () => [] as number[]);
-const specialUppercaseMapping = Array.from({ length: COUNT }, () => [] as number[]);
-const specialCasingCondition = Array.from({ length: COUNT }, () => [] as string[]);
-const specialLowercaseMappingConditional = Array.from({ length: COUNT }, () => [] as number[]);
-const specialTitlecaseMappingConditional = Array.from({ length: COUNT }, () => [] as number[]);
-const specialUppercaseMappingConditional = Array.from({ length: COUNT }, () => [] as number[]);
-
-for (const line of readLines("SpecialCasing.txt")) {
-  const fields = parseDataLine(line);
-  if (!fields) continue;
-  const cp = hex(fields[0]!);
-  const lower = fields[1]!.split(/\s+/).filter(Boolean).map(hex);
-  const title = fields[2]!.split(/\s+/).filter(Boolean).map(hex);
-  const upper = fields[3]!.split(/\s+/).filter(Boolean).map(hex);
-  const conditions = (fields[4] ?? "").split(/\s+/).filter(Boolean).map(normalizeName);
-  hasSpecialCasing[cp] = true;
-  if (conditions.length === 0) {
-    specialLowercaseMapping[cp] = lower;
-    specialTitlecaseMapping[cp] = title;
-    specialUppercaseMapping[cp] = upper;
-  } else {
-    specialCasingCondition[cp] = conditions;
-    specialLowercaseMappingConditional[cp] = lower;
-    specialTitlecaseMappingConditional[cp] = title;
-    specialUppercaseMappingConditional[cp] = upper;
-  }
-}
-
-const lowercaseMapping = Array.from(
-  { length: COUNT },
-  (_, cp) => [simpleLowercaseMapping[cp]!] as number[],
-);
-const titlecaseMapping = Array.from(
-  { length: COUNT },
-  (_, cp) => [simpleTitlecaseMapping[cp]!] as number[],
-);
-const uppercaseMapping = Array.from(
-  { length: COUNT },
-  (_, cp) => [simpleUppercaseMapping[cp]!] as number[],
-);
-for (let cp = 0; cp < COUNT; cp += 1) {
-  if (hasSpecialCasing[cp] && specialCasingCondition[cp]!.length === 0) {
-    lowercaseMapping[cp] = specialLowercaseMapping[cp]!;
-    titlecaseMapping[cp] = specialTitlecaseMapping[cp]!;
-    uppercaseMapping[cp] = specialUppercaseMapping[cp]!;
-  }
-}
-
 const boolFields = Object.fromEntries(
   Object.values(derivedPropNames).map((field) => [field, fill(false)]),
 ) as Record<string, boolean[]>;
@@ -456,14 +283,6 @@ for (const line of readLines("DerivedCoreProperties.txt")) {
   }
   const name = derivedPropNames[fields[1]!];
   if (name) setRange(boolFields[name]!, start, end, true);
-}
-
-const bidiClassDerived = fill("left_to_right");
-for (const line of readLines("extracted/DerivedBidiClass.txt")) {
-  const fields = parseDataLine(line);
-  if (!fields) continue;
-  const [start, end] = parseRange(fields[0]!);
-  setRange(bidiClassDerived, start, end, bidiMap[fields[1]!] ?? "left_to_right");
 }
 
 const eastAsianWidth = fill("neutral");
@@ -511,30 +330,6 @@ for (const line of readLines("emoji/emoji-variation-sequences.txt")) {
   if (cps.length === 2 && (cps[1] === 0xfe0e || cps[1] === 0xfe0f)) isEmojiVsBase[cps[0]!] = true;
 }
 
-const bidiPairedBracket = Array.from(
-  { length: COUNT },
-  () => ({ type: "none" }) as { type: string; codePoint?: number },
-);
-for (const line of readLines("BidiBrackets.txt")) {
-  const fields = parseDataLine(line);
-  if (!fields) continue;
-  const cp = hex(fields[0]!);
-  const paired = hex(fields[1]!);
-  bidiPairedBracket[cp] =
-    fields[2] === "o"
-      ? { type: "open", codePoint: paired }
-      : fields[2] === "c"
-        ? { type: "close", codePoint: paired }
-        : { type: "none" };
-}
-
-const bidiMirroring = fill<number | null>(null);
-for (const line of readLines("BidiMirroring.txt")) {
-  const fields = parseDataLine(line);
-  if (!fields) continue;
-  bidiMirroring[hex(fields[0]!)] = hex(fields[1]!);
-}
-
 function parseRangeFile(
   path: string,
   defaultValue: string,
@@ -548,28 +343,6 @@ function parseRangeFile(
     setRange(out, start, end, valueMap[fields[1]!] ?? normalizeName(fields[1]!));
   }
   return out;
-}
-
-const unicodeBlock = parseRangeFile("Blocks.txt", "no_block");
-const script = parseRangeFile("Scripts.txt", "unknown");
-const joiningType = parseRangeFile("extracted/DerivedJoiningType.txt", "non_joining", {
-  C: "join_causing",
-  D: "dual_joining",
-  L: "left_joining",
-  R: "right_joining",
-  T: "transparent",
-  U: "non_joining",
-});
-const joiningGroup = parseRangeFile("extracted/DerivedJoiningGroup.txt", "no_joining_group");
-const indicPositionalCategory = parseRangeFile("IndicPositionalCategory.txt", "not_applicable");
-const indicSyllabicCategory = parseRangeFile("IndicSyllabicCategory.txt", "other");
-
-const isCompositionExclusion = fill(false);
-for (const line of readLines("CompositionExclusions.txt")) {
-  const fields = parseDataLine(line);
-  if (!fields) continue;
-  const [start, end] = parseRange(fields[0]!);
-  setRange(isCompositionExclusion, start, end, true);
 }
 
 const propListFields = Object.fromEntries(
@@ -605,6 +378,59 @@ const graphemeBreakNoControl = graphemeBreak.map((value) =>
   value === "control" || value === "cr" || value === "lf" ? "other" : value,
 );
 
+const graphemeBreakNames = [
+  "other",
+  "control",
+  "prepend",
+  "cr",
+  "lf",
+  "regional_indicator",
+  "spacing_mark",
+  "l",
+  "v",
+  "t",
+  "lv",
+  "lvt",
+  "zwj",
+  "zwnj",
+  "extended_pictographic",
+  "emoji_modifier_base",
+  "emoji_modifier",
+  "indic_conjunct_break_extend",
+  "indic_conjunct_break_linker",
+  "indic_conjunct_break_consonant",
+];
+const graphemeBreakIDs = propertyIDs(graphemeBreakNames);
+const generalCategoryNames = propertyNames(generalCategory, "other_not_assigned");
+const generalCategoryIDs = propertyIDs(generalCategoryNames);
+const eastAsianWidthNames = propertyNames(eastAsianWidth, "neutral");
+const eastAsianWidthIDs = propertyIDs(eastAsianWidthNames);
+const wordBreakNames = propertyNames(wordBreak, "other");
+const wordBreakIDs = propertyIDs(wordBreakNames);
+const sentenceBreakNames = propertyNames(sentenceBreak, "other");
+const sentenceBreakIDs = propertyIDs(sentenceBreakNames);
+const lineBreakNames = propertyNames(lineBreak, "xx");
+const lineBreakIDs = propertyIDs(lineBreakNames);
+
+const RUNTIME_WIDTH_MASK = 0x03;
+const RUNTIME_ZERO_WIDTH_FLAG = 0x04;
+const RUNTIME_EMOJI_VS_FLAG = 0x01;
+const RUNTIME_EMOJI_PRESENTATION_FLAG = 0x02;
+const RUNTIME_EXTENDED_PICTOGRAPHIC_FLAG = 0x04;
+const RUNTIME_WHITE_SPACE_FLAG = 0x08;
+const RUNTIME_ASCII_HEX_DIGIT_FLAG = 1 << 0;
+const RUNTIME_HEX_DIGIT_FLAG = 1 << 1;
+const RUNTIME_DASH_FLAG = 1 << 2;
+const RUNTIME_DIACRITIC_FLAG = 1 << 3;
+const RUNTIME_QUOTATION_MARK_FLAG = 1 << 4;
+const RUNTIME_PATTERN_SYNTAX_FLAG = 1 << 5;
+const RUNTIME_PATTERN_WHITE_SPACE_FLAG = 1 << 6;
+const RUNTIME_VARIATION_SELECTOR_FLAG = 1 << 7;
+const RUNTIME_NONCHARACTER_FLAG = 1 << 8;
+const RUNTIME_UNIFIED_IDEOGRAPH_FLAG = 1 << 9;
+const BLOCK_SIZE = 256;
+const NUM_BLOCKS = Math.ceil(COUNT / BLOCK_SIZE);
+
 const wcwidthStandalone = fill(1);
 const wcwidthZeroInGrapheme = fill(false);
 for (let cp = 0; cp < COUNT; cp += 1) {
@@ -634,124 +460,235 @@ for (let cp = 0; cp < COUNT; cp += 1) {
     graphemeBreak[cp] === "prepend";
 }
 
-const generated = {
+type RuntimeRow = {
+  gb: number;
+  width: number;
+  wb: number;
+  sb: number;
+  lb: number;
+  eaw: number;
+  gc: number;
+  flags: number;
+  flags2: number;
+  upperDelta: number;
+  lowerDelta: number;
+  titleDelta: number;
+  foldDelta: number;
+  foldKeyDelta: number;
+};
+
+const defaultRuntimeRow: RuntimeRow = {
+  gb: graphemeBreakIDs["other"]!,
+  width: 1,
+  wb: wordBreakIDs["other"]!,
+  sb: sentenceBreakIDs["other"]!,
+  lb: lineBreakIDs["xx"]!,
+  eaw: eastAsianWidthIDs["neutral"]!,
+  gc: generalCategoryIDs["other_not_assigned"]!,
+  flags: 0,
+  flags2: 0,
+  upperDelta: 0,
+  lowerDelta: 0,
+  titleDelta: 0,
+  foldDelta: 0,
+  foldKeyDelta: 0,
+};
+
+function runtimeRowKey(row: RuntimeRow): string {
+  return [
+    row.gb,
+    row.width,
+    row.wb,
+    row.sb,
+    row.lb,
+    row.eaw,
+    row.gc,
+    row.flags,
+    row.flags2,
+    row.upperDelta,
+    row.lowerDelta,
+    row.titleDelta,
+    row.foldDelta,
+    row.foldKeyDelta,
+  ].join(",");
+}
+
+function buildRuntimePropertyTables(): {
+  stage1: number[];
+  stage2: number[];
+  gb: number[];
+  width: number[];
+  wb: number[];
+  sb: number[];
+  lb: number[];
+  eaw: number[];
+  gc: number[];
+  flags: number[];
+  flags2: number[];
+  upperDelta: number[];
+  lowerDelta: number[];
+  titleDelta: number[];
+  foldDelta: number[];
+  foldKeyDelta: number[];
+} {
+  const rowIDs = new Map<string, number>();
+  const stage1: number[] = [];
+  const stage2: number[] = [];
+  const stage2Blocks = new Map<string, number>();
+  const out = {
+    stage1,
+    stage2,
+    gb: [] as number[],
+    width: [] as number[],
+    wb: [] as number[],
+    sb: [] as number[],
+    lb: [] as number[],
+    eaw: [] as number[],
+    gc: [] as number[],
+    flags: [] as number[],
+    flags2: [] as number[],
+    upperDelta: [] as number[],
+    lowerDelta: [] as number[],
+    titleDelta: [] as number[],
+    foldDelta: [] as number[],
+    foldKeyDelta: [] as number[],
+  };
+
+  function pushRow(row: RuntimeRow): number {
+    const key = runtimeRowKey(row);
+    const existing = rowIDs.get(key);
+    if (existing !== undefined) return existing;
+    const id = out.gb.length;
+    rowIDs.set(key, id);
+    out.gb.push(row.gb);
+    out.width.push(row.width);
+    out.wb.push(row.wb);
+    out.sb.push(row.sb);
+    out.lb.push(row.lb);
+    out.eaw.push(row.eaw);
+    out.gc.push(row.gc);
+    out.flags.push(row.flags);
+    out.flags2.push(row.flags2);
+    out.upperDelta.push(row.upperDelta);
+    out.lowerDelta.push(row.lowerDelta);
+    out.titleDelta.push(row.titleDelta);
+    out.foldDelta.push(row.foldDelta);
+    out.foldKeyDelta.push(row.foldKeyDelta);
+    return id;
+  }
+
+  pushRow(defaultRuntimeRow);
+
+  for (let blockIndex = 0; blockIndex < NUM_BLOCKS; blockIndex += 1) {
+    const block: number[] = [];
+    for (let i = 0; i < BLOCK_SIZE; i += 1) {
+      const cp = blockIndex * BLOCK_SIZE + i;
+      if (cp > MAX) {
+        block.push(0);
+        continue;
+      }
+
+      let width = wcwidthStandalone[cp]! & RUNTIME_WIDTH_MASK;
+      if (wcwidthZeroInGrapheme[cp]) width |= RUNTIME_ZERO_WIDTH_FLAG;
+
+      let flags = 0;
+      if (isEmojiVsBase[cp]) flags |= RUNTIME_EMOJI_VS_FLAG;
+      if (emojiFields["is_emoji_presentation"]![cp]) flags |= RUNTIME_EMOJI_PRESENTATION_FLAG;
+      if (emojiFields["is_extended_pictographic"]![cp]) flags |= RUNTIME_EXTENDED_PICTOGRAPHIC_FLAG;
+      if (propListFields["is_white_space"]![cp]) flags |= RUNTIME_WHITE_SPACE_FLAG;
+
+      let flags2 = 0;
+      if (propListFields["is_ascii_hex_digit"]![cp]) flags2 |= RUNTIME_ASCII_HEX_DIGIT_FLAG;
+      if (propListFields["is_hex_digit"]![cp]) flags2 |= RUNTIME_HEX_DIGIT_FLAG;
+      if (propListFields["is_dash"]![cp]) flags2 |= RUNTIME_DASH_FLAG;
+      if (propListFields["is_diacritic"]![cp]) flags2 |= RUNTIME_DIACRITIC_FLAG;
+      if (propListFields["is_quotation_mark"]![cp]) flags2 |= RUNTIME_QUOTATION_MARK_FLAG;
+      if (propListFields["is_pattern_syntax"]![cp]) flags2 |= RUNTIME_PATTERN_SYNTAX_FLAG;
+      if (propListFields["is_pattern_white_space"]![cp]) flags2 |= RUNTIME_PATTERN_WHITE_SPACE_FLAG;
+      if (propListFields["is_variation_selector"]![cp]) flags2 |= RUNTIME_VARIATION_SELECTOR_FLAG;
+      if (propListFields["is_noncharacter"]![cp]) flags2 |= RUNTIME_NONCHARACTER_FLAG;
+      if (propListFields["is_unified_ideograph"]![cp]) flags2 |= RUNTIME_UNIFIED_IDEOGRAPH_FLAG;
+
+      block.push(
+        pushRow({
+          gb: propertyID("grapheme_break", graphemeBreak[cp]!, graphemeBreakIDs),
+          width,
+          wb: propertyID("word_break", wordBreak[cp]!, wordBreakIDs),
+          sb: propertyID("sentence_break", sentenceBreak[cp]!, sentenceBreakIDs),
+          lb: propertyID("line_break", lineBreak[cp]!, lineBreakIDs),
+          eaw: propertyID("east_asian_width", eastAsianWidth[cp]!, eastAsianWidthIDs),
+          gc: propertyID("general_category", generalCategory[cp]!, generalCategoryIDs),
+          flags,
+          flags2,
+          upperDelta: simpleUppercaseMapping[cp]! - cp,
+          lowerDelta: simpleLowercaseMapping[cp]! - cp,
+          titleDelta: simpleTitlecaseMapping[cp]! - cp,
+          foldDelta: simpleFold[cp]! - cp,
+          foldKeyDelta: simpleFoldKey[cp]! - cp,
+        }),
+      );
+    }
+
+    const key = block.join(",");
+    let offset = stage2Blocks.get(key);
+    if (offset === undefined) {
+      offset = out.stage2.length;
+      stage2Blocks.set(key, offset);
+      out.stage2.push(...block);
+    }
+    out.stage1.push(offset);
+  }
+
+  return out;
+}
+
+const runtimePropertyTables = buildRuntimePropertyTables();
+const runtimeProps = {
   maxCodePoint: MAX,
-  ranges: {
-    general_category: toRanges(generalCategory, "other_not_assigned"),
-    canonical_combining_class: toRanges(canonicalCombiningClass, 0),
-    bidi_class: toRanges(bidiClassDerived, "left_to_right"),
-    decomposition_type: toRanges(decompositionType, "default"),
-    numeric_type: toRanges(numericType, "none"),
-    east_asian_width: toRanges(eastAsianWidth, "neutral"),
-    word_break: toRanges(wordBreak, "other"),
-    sentence_break: toRanges(sentenceBreak, "other"),
-    line_break: toRanges(lineBreak, "xx"),
-    original_grapheme_break: toRanges(originalGraphemeBreak, "other"),
-    indic_conjunct_break: toRanges(indicConjunctBreak, "none"),
-    grapheme_break: toRanges(graphemeBreak, "other"),
-    grapheme_break_no_control: toRanges(graphemeBreakNoControl, "other"),
-    block: toRanges(unicodeBlock, "no_block"),
-    script: toRanges(script, "unknown"),
-    joining_type: toRanges(joiningType, "non_joining"),
-    joining_group: toRanges(joiningGroup, "no_joining_group"),
-    indic_positional_category: toRanges(indicPositionalCategory, "not_applicable"),
-    indic_syllabic_category: toRanges(indicSyllabicCategory, "other"),
-    wcwidth_standalone: toRanges(wcwidthStandalone, 1),
-    ...Object.fromEntries(
-      Object.entries(boolFields).map(([name, data]) => [name, toRanges(data, false)]),
-    ),
-    ...Object.fromEntries(
-      Object.entries(emojiFields).map(([name, data]) => [name, toRanges(data, false)]),
-    ),
-    is_emoji_vs_base: toRanges(isEmojiVsBase, false),
-    is_composition_exclusion: toRanges(isCompositionExclusion, false),
-    ...Object.fromEntries(
-      Object.entries(propListFields).map(([name, data]) => [name, toRanges(data, false)]),
-    ),
-    is_bidi_mirrored: toRanges(isBidiMirrored, false),
-    has_special_casing: toRanges(hasSpecialCasing, false),
-    wcwidth_zero_in_grapheme: toRanges(wcwidthZeroInGrapheme, false),
-  },
-  maps: {
-    name: toSparse(names, ""),
-    decomposition_mapping: toSparseArray(decompositionMapping),
-    numeric_value_decimal: toSparse(numericValueDecimal, null),
-    numeric_value_digit: toSparse(numericValueDigit, null),
-    numeric_value_numeric: toSparse(numericValueNumeric, ""),
-    unicode_1_name: toSparse(unicode1Name, ""),
-    simple_uppercase_mapping: toSparse(simpleUppercaseMapping, 0).filter(
-      ([cp, value]) => cp !== value,
-    ),
-    simple_lowercase_mapping: toSparse(simpleLowercaseMapping, 0).filter(
-      ([cp, value]) => cp !== value,
-    ),
-    simple_titlecase_mapping: toSparse(simpleTitlecaseMapping, 0).filter(
-      ([cp, value]) => cp !== value,
-    ),
-    case_folding_simple: toSparse(caseFoldingSimple, 0).filter(([cp, value]) => cp !== value),
-    simple_fold: toSparse(simpleFold, 0).filter(([cp, value]) => cp !== value),
-    simple_fold_key: toSparse(simpleFoldKey, 0).filter(([cp, value]) => cp !== value),
-    case_folding_full: toSparseArray(
-      caseFoldingFull.map((value, cp) => (value.length === 1 && value[0] === cp ? [] : value)),
-    ),
-    case_folding_turkish_only: toSparse(caseFoldingTurkishOnly, null),
-    case_folding_common_only: toSparse(caseFoldingCommonOnly, null),
-    case_folding_simple_only: toSparse(caseFoldingSimpleOnly, null),
-    case_folding_full_only: toSparseArray(caseFoldingFullOnly),
-    special_lowercase_mapping: toSparseArray(specialLowercaseMapping),
-    special_titlecase_mapping: toSparseArray(specialTitlecaseMapping),
-    special_uppercase_mapping: toSparseArray(specialUppercaseMapping),
-    special_casing_condition: toSparseArray(specialCasingCondition),
-    special_lowercase_mapping_conditional: toSparseArray(specialLowercaseMappingConditional),
-    special_titlecase_mapping_conditional: toSparseArray(specialTitlecaseMappingConditional),
-    special_uppercase_mapping_conditional: toSparseArray(specialUppercaseMappingConditional),
-    lowercase_mapping: toSparseArray(
-      lowercaseMapping.map((value, cp) => (value.length === 1 && value[0] === cp ? [] : value)),
-    ),
-    titlecase_mapping: toSparseArray(
-      titlecaseMapping.map((value, cp) => (value.length === 1 && value[0] === cp ? [] : value)),
-    ),
-    uppercase_mapping: toSparseArray(
-      uppercaseMapping.map((value, cp) => (value.length === 1 && value[0] === cp ? [] : value)),
-    ),
-    bidi_paired_bracket: toSparse(bidiPairedBracket, bidiPairedBracket[0]!).filter(
-      ([, value]) => value.type !== "none",
-    ),
-    bidi_mirroring: toSparse(bidiMirroring, null),
-  },
+  widthMask: RUNTIME_WIDTH_MASK,
+  zeroWidthFlag: RUNTIME_ZERO_WIDTH_FLAG,
+  emojiVSFlag: RUNTIME_EMOJI_VS_FLAG,
+  emojiPresentationFlag: RUNTIME_EMOJI_PRESENTATION_FLAG,
+  extendedPictographicFlag: RUNTIME_EXTENDED_PICTOGRAPHIC_FLAG,
+  whiteSpaceFlag: RUNTIME_WHITE_SPACE_FLAG,
+  asciiHexDigitFlag: RUNTIME_ASCII_HEX_DIGIT_FLAG,
+  hexDigitFlag: RUNTIME_HEX_DIGIT_FLAG,
+  dashFlag: RUNTIME_DASH_FLAG,
+  diacriticFlag: RUNTIME_DIACRITIC_FLAG,
+  quotationMarkFlag: RUNTIME_QUOTATION_MARK_FLAG,
+  patternSyntaxFlag: RUNTIME_PATTERN_SYNTAX_FLAG,
+  patternWhiteSpaceFlag: RUNTIME_PATTERN_WHITE_SPACE_FLAG,
+  variationSelectorFlag: RUNTIME_VARIATION_SELECTOR_FLAG,
+  noncharacterFlag: RUNTIME_NONCHARACTER_FLAG,
+  unifiedIdeographFlag: RUNTIME_UNIFIED_IDEOGRAPH_FLAG,
+  stage1Shift: 8,
+  stage2Mask: 0xff,
+  stage1: runtimePropertyTables.stage1,
+  stage2: runtimePropertyTables.stage2,
+  gb: runtimePropertyTables.gb,
+  width: runtimePropertyTables.width,
+  wb: runtimePropertyTables.wb,
+  sb: runtimePropertyTables.sb,
+  lb: runtimePropertyTables.lb,
+  eaw: runtimePropertyTables.eaw,
+  gc: runtimePropertyTables.gc,
+  flags: runtimePropertyTables.flags,
+  flags2: runtimePropertyTables.flags2,
+  upperDelta: runtimePropertyTables.upperDelta,
+  lowerDelta: runtimePropertyTables.lowerDelta,
+  titleDelta: runtimePropertyTables.titleDelta,
+  foldDelta: runtimePropertyTables.foldDelta,
+  foldKeyDelta: runtimePropertyTables.foldKeyDelta,
+  graphemeBreakNames,
+  generalCategoryNames,
+  eastAsianWidthNames,
+  wordBreakNames,
+  sentenceBreakNames,
+  lineBreakNames,
 };
-
-const gbID: Record<string, number> = {
-  other: 0,
-  control: 1,
-  prepend: 2,
-  cr: 3,
-  lf: 4,
-  regional_indicator: 5,
-  spacing_mark: 6,
-  l: 7,
-  v: 8,
-  t: 9,
-  lv: 10,
-  lvt: 11,
-  zwj: 12,
-  zwnj: 13,
-  extended_pictographic: 14,
-  emoji_modifier_base: 15,
-  emoji_modifier: 16,
-  indic_conjunct_break_extend: 17,
-  indic_conjunct_break_linker: 18,
-  indic_conjunct_break_consonant: 19,
-};
-
-const RUNTIME_WIDTH_MASK = 0x03;
-const RUNTIME_ZERO_WIDTH_FLAG = 0x04;
-const RUNTIME_EMOJI_VS_FLAG = 0x01;
-const BLOCK_SIZE = 256;
-const NUM_BLOCKS = Math.ceil(COUNT / BLOCK_SIZE);
 
 function packRuntimeRow(cp: number): number {
-  const gb = gbID[graphemeBreak[cp]!] ?? 0;
+  const gb = graphemeBreakIDs[graphemeBreak[cp]!] ?? 0;
   let width = wcwidthStandalone[cp]! & RUNTIME_WIDTH_MASK;
   if (wcwidthZeroInGrapheme[cp]) width |= RUNTIME_ZERO_WIDTH_FLAG;
   const flags = isEmojiVsBase[cp] ? RUNTIME_EMOJI_VS_FLAG : 0;
@@ -806,12 +743,6 @@ const runtimeWidth = {
 
 const generatedTypes = `/* This file is generated by scripts/generate.ts. */
 
-${typeAlias("BidiClass", bidiClassDerived)}
-
-${typeAlias("UnicodeBlock", unicodeBlock)}
-
-${typeAlias("DecompositionType", decompositionType)}
-
 ${typeAlias("EastAsianWidth", eastAsianWidth)}
 
 ${typeAlias("WordBreak", wordBreak)}
@@ -825,40 +756,22 @@ ${typeAlias("GeneralCategory", generalCategory)}
 ${typeAlias("GraphemeBreakProperty", graphemeBreak)}
 
 ${typeAlias("GraphemeBreakNoControlProperty", graphemeBreakNoControl)}
-
-${typeAlias("IndicConjunctBreak", indicConjunctBreak)}
-
-${typeAlias("IndicPositionalCategory", indicPositionalCategory)}
-
-${typeAlias("IndicSyllabicCategory", indicSyllabicCategory)}
-
-${typeAlias("JoiningGroup", joiningGroup)}
-
-${typeAlias("JoiningType", joiningType)}
-
-${typeAlias("NumericType", numericType)}
-
-${typeAlias("OriginalGraphemeBreak", originalGraphemeBreak)}
-
-${typeAlias("Script", script)}
-
-${typeAlias("SpecialCasingCondition", arrayValues(specialCasingCondition))}
 `;
 
-const out = join(root, "src/generated/tables.ts");
-const jsonOut = join(root, "src/generated/tables.json");
 const runtimeOut = join(root, "src/generated/runtime_width.ts");
 const runtimeJsonOut = join(root, "src/generated/runtime_width.json");
+const runtimePropsOut = join(root, "src/generated/runtime_props.ts");
+const runtimePropsJsonOut = join(root, "src/generated/runtime_props.json");
 const typesOut = join(root, "src/generated/types.ts");
-mkdirSync(dirname(out), { recursive: true });
-writeFileSync(jsonOut, JSON.stringify(generated));
+mkdirSync(dirname(runtimeOut), { recursive: true });
 writeFileSync(runtimeJsonOut, JSON.stringify(runtimeWidth));
+writeFileSync(runtimePropsJsonOut, JSON.stringify(runtimeProps));
 writeFileSync(typesOut, generatedTypes);
-writeFileSync(
-  out,
-  `/* This file is generated by scripts/generate.ts. */\nimport { readFileSync } from "node:fs";\n\nexport const tables = JSON.parse(readFileSync(new URL("./tables.json", import.meta.url), "utf8")) as {\n  maxCodePoint: number;\n  ranges: Record<string, readonly (readonly [number, number, unknown])[]>;\n  maps: Record<string, readonly (readonly [number, unknown])[]>;\n};\n`,
-);
 writeFileSync(
   runtimeOut,
   `/* This file is generated by scripts/generate.ts. */\nimport { readFileSync } from "node:fs";\n\nconst raw = JSON.parse(readFileSync(new URL("./runtime_width.json", import.meta.url), "utf8")) as {\n  maxCodePoint: number;\n  widthMask: number;\n  zeroWidthFlag: number;\n  emojiVSFlag: number;\n  stage1Shift: number;\n  stage2Mask: number;\n  stage1: number[];\n  stage2: number[];\n  stage3: number[];\n};\n\nexport const runtimeWidth = {\n  maxCodePoint: raw.maxCodePoint,\n  widthMask: raw.widthMask,\n  zeroWidthFlag: raw.zeroWidthFlag,\n  emojiVSFlag: raw.emojiVSFlag,\n  stage1Shift: raw.stage1Shift,\n  stage2Mask: raw.stage2Mask,\n  stage1: Uint16Array.from(raw.stage1),\n  stage2: Uint8Array.from(raw.stage2),\n  stage3: Uint16Array.from(raw.stage3),\n};\n`,
+);
+writeFileSync(
+  runtimePropsOut,
+  `/* This file is generated by scripts/generate.ts. */\nimport { readFileSync } from "node:fs";\n\nconst raw = JSON.parse(readFileSync(new URL("./runtime_props.json", import.meta.url), "utf8")) as {\n  maxCodePoint: number;\n  widthMask: number;\n  zeroWidthFlag: number;\n  emojiVSFlag: number;\n  emojiPresentationFlag: number;\n  extendedPictographicFlag: number;\n  whiteSpaceFlag: number;\n  asciiHexDigitFlag: number;\n  hexDigitFlag: number;\n  dashFlag: number;\n  diacriticFlag: number;\n  quotationMarkFlag: number;\n  patternSyntaxFlag: number;\n  patternWhiteSpaceFlag: number;\n  variationSelectorFlag: number;\n  noncharacterFlag: number;\n  unifiedIdeographFlag: number;\n  stage1Shift: number;\n  stage2Mask: number;\n  stage1: number[];\n  stage2: number[];\n  gb: number[];\n  width: number[];\n  wb: number[];\n  sb: number[];\n  lb: number[];\n  eaw: number[];\n  gc: number[];\n  flags: number[];\n  flags2: number[];\n  upperDelta: number[];\n  lowerDelta: number[];\n  titleDelta: number[];\n  foldDelta: number[];\n  foldKeyDelta: number[];\n  graphemeBreakNames: string[];\n  generalCategoryNames: string[];\n  eastAsianWidthNames: string[];\n  wordBreakNames: string[];\n  sentenceBreakNames: string[];\n  lineBreakNames: string[];\n};\n\nexport const runtimeProps = {\n  maxCodePoint: raw.maxCodePoint,\n  widthMask: raw.widthMask,\n  zeroWidthFlag: raw.zeroWidthFlag,\n  emojiVSFlag: raw.emojiVSFlag,\n  emojiPresentationFlag: raw.emojiPresentationFlag,\n  extendedPictographicFlag: raw.extendedPictographicFlag,\n  whiteSpaceFlag: raw.whiteSpaceFlag,\n  asciiHexDigitFlag: raw.asciiHexDigitFlag,\n  hexDigitFlag: raw.hexDigitFlag,\n  dashFlag: raw.dashFlag,\n  diacriticFlag: raw.diacriticFlag,\n  quotationMarkFlag: raw.quotationMarkFlag,\n  patternSyntaxFlag: raw.patternSyntaxFlag,\n  patternWhiteSpaceFlag: raw.patternWhiteSpaceFlag,\n  variationSelectorFlag: raw.variationSelectorFlag,\n  noncharacterFlag: raw.noncharacterFlag,\n  unifiedIdeographFlag: raw.unifiedIdeographFlag,\n  stage1Shift: raw.stage1Shift,\n  stage2Mask: raw.stage2Mask,\n  stage1: Uint32Array.from(raw.stage1),\n  stage2: Uint32Array.from(raw.stage2),\n  gb: Uint8Array.from(raw.gb),\n  width: Uint8Array.from(raw.width),\n  wb: Uint8Array.from(raw.wb),\n  sb: Uint8Array.from(raw.sb),\n  lb: Uint8Array.from(raw.lb),\n  eaw: Uint8Array.from(raw.eaw),\n  gc: Uint8Array.from(raw.gc),\n  flags: Uint8Array.from(raw.flags),\n  flags2: Uint16Array.from(raw.flags2),\n  upperDelta: Int32Array.from(raw.upperDelta),\n  lowerDelta: Int32Array.from(raw.lowerDelta),\n  titleDelta: Int32Array.from(raw.titleDelta),\n  foldDelta: Int32Array.from(raw.foldDelta),\n  foldKeyDelta: Int32Array.from(raw.foldKeyDelta),\n  graphemeBreakNames: raw.graphemeBreakNames,\n  generalCategoryNames: raw.generalCategoryNames,\n  eastAsianWidthNames: raw.eastAsianWidthNames,\n  wordBreakNames: raw.wordBreakNames,\n  sentenceBreakNames: raw.sentenceBreakNames,\n  lineBreakNames: raw.lineBreakNames,\n};\n\n${generatedIDObject("graphemeBreakIDs", graphemeBreakIDs)}\n\n${generatedIDObject("generalCategoryIDs", generalCategoryIDs)}\n\n${generatedIDObject("eastAsianWidthIDs", eastAsianWidthIDs)}\n\n${generatedIDObject("wordBreakIDs", wordBreakIDs)}\n\n${generatedIDObject("sentenceBreakIDs", sentenceBreakIDs)}\n\n${generatedIDObject("lineBreakIDs", lineBreakIDs)}\n`,
 );

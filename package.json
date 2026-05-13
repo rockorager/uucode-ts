@@ -35,7 +35,7 @@
   ],
   "scripts": {
     "generate": "tsx scripts/generate.ts",
-    "build": "rm -rf dist && npm run generate && tsc -p tsconfig.json && cp src/generated/tables.json dist/src/generated/tables.json && cp src/generated/runtime_width.json dist/src/generated/runtime_width.json",
+    "build": "rm -rf dist && npm run generate && tsc -p tsconfig.json && cp src/generated/runtime_width.json dist/src/generated/runtime_width.json && cp src/generated/runtime_props.json dist/src/generated/runtime_props.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "format": "oxfmt --write 'src/**/*.ts' 'scripts/**/*.ts' 'test/**/*.ts' 'benchmark/**/*.ts'",
     "format:check": "oxfmt --check 'src/**/*.ts' 'scripts/**/*.ts' 'test/**/*.ts' 'benchmark/**/*.ts'",

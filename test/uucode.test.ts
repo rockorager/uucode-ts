@@ -6,12 +6,15 @@ import * as grapheme from "../src/grapheme_internal.js";
 import * as width from "../src/width.js";
 import {
   equalFold,
+  eastAsianWidth,
   generalCategory,
+  graphemeBreakProperty,
   graphemes,
   isASCIIHexDigit,
   isDash,
   isDiacritic,
   isEmojiPresentation,
+  isExtendedPictographic,
   isGraphic,
   isHexDigit,
   isNoncharacter,
@@ -31,8 +34,13 @@ import {
   toUpper,
   isVariationSelector,
 } from "../src/index.js";
-import { get, getBoolean, getCodePoints, getNumber, getProperties, getString } from "../src/get.js";
-import type { FieldValueFor, GeneralCategory, Script } from "../src/get.js";
+import type { GeneralCategory } from "../src/index.js";
+
+function toNoControlBreak(
+  value: ReturnType<typeof graphemeBreakProperty>,
+): ReturnType<typeof graphemeBreakProperty> {
+  return value === "control" || value === "cr" || value === "lf" ? "other" : value;
+}
 
 test("ascii helpers", () => {
   assert.equal(ascii.isAlphanumeric("A".codePointAt(0)!), true);
@@ -47,85 +55,16 @@ test("ascii helpers", () => {
 });
 
 test("core Unicode properties", () => {
-  assert.equal(getString("name", 65), "LATIN CAPITAL LETTER A");
-  assert.equal(getBoolean("is_alphabetic", 65), true);
-  assert.equal(getBoolean("is_alphabetic", 0), false);
-  assert.equal(get("general_category", 65), "letter_uppercase");
-  assert.equal(get("general_category", 0x2200), "symbol_math");
-  assert.equal(getNumber("case_folding_simple", 65), 97);
-  assert.equal(getNumber("simple_fold", 0x006b), 0x212a);
-  assert.equal(getNumber("simple_uppercase_mapping", 0x03c2), 0x03a3);
-  assert.deepEqual(getCodePoints("uppercase_mapping", 0x00df), [0x0053, 0x0053]);
-  assert.deepEqual(getCodePoints("decomposition_mapping", 0x00c0), [0x0041, 0x0300]);
-  assert.equal(get("decomposition_type", 0x00c0), "canonical");
-  assert.equal(get("decomposition_type", 0xfcc8), "initial");
-  assert.deepEqual(getCodePoints("case_folding_full", 0x00df), [0x0073, 0x0073]);
-  assert.equal(get("case_folding_turkish_only", 0x0049), 0x0131);
-  assert.equal(get("case_folding_common_only", 0x0041), 0x0061);
-  assert.equal(get("case_folding_simple_only", 0x1e9e), 0x00df);
-  assert.deepEqual(get("case_folding_full_only", 0x00df), [0x0073, 0x0073]);
-  assert.deepEqual(getProperties(0x1f600).bidi_paired_bracket, { type: "none" });
-  assert.equal(getProperties(0x1f600).is_emoji_presentation, true);
-  assert.equal(getBoolean("has_special_casing", 0x00df), true);
-  assert.deepEqual(get("special_casing_condition", 0x03a3), ["final_sigma"]);
-  assert.deepEqual(getCodePoints("special_lowercase_mapping", 0x00df), [0x00df]);
-  assert.deepEqual(getCodePoints("special_titlecase_mapping", 0x00df), [0x0053, 0x0073]);
-  assert.deepEqual(getCodePoints("special_uppercase_mapping", 0x00df), [0x0053, 0x0053]);
-  assert.deepEqual(getCodePoints("special_lowercase_mapping_conditional", 0x03a3), [0x03c2]);
-  assert.deepEqual(getCodePoints("special_titlecase_mapping_conditional", 0x03a3), [0x03a3]);
-  assert.deepEqual(getCodePoints("special_uppercase_mapping_conditional", 0x03a3), [0x03a3]);
+  assert.equal(generalCategory(65), "letter_uppercase");
+  assert.equal(generalCategory(0x2200), "symbol_math");
+  assert.equal(eastAsianWidth(0xff01), "fullwidth");
+  assert.equal(graphemeBreakProperty(0x000d), "cr");
+  assert.equal(graphemeBreakProperty(0x094d), "indic_conjunct_break_linker");
 });
 
 test("categorical Unicode properties expose literal union types", () => {
   const category: GeneralCategory = generalCategory(0x2200);
-  const categoryFromMap: FieldValueFor<"general_category"> = category;
-  const script: Script = get("script", 0x03b1);
-  assert.equal(categoryFromMap, "symbol_math");
-  assert.equal(script, "greek");
-});
-
-test("misc Unicode properties", () => {
-  assert.equal(get("bidi_class", 0x0600), "arabic_number");
-  assert.equal(get("block", 0x0041), "basic_latin");
-  assert.equal(get("block", 0x03b1), "greek_and_coptic");
-  assert.equal(get("script", 0x0041), "latin");
-  assert.equal(get("script", 0x03b1), "greek");
-  assert.equal(get("script", 0x4e00), "han");
-  assert.equal(get("joining_type", 0x0628), "dual_joining");
-  assert.equal(get("joining_group", 0x0628), "beh");
-  assert.equal(get("indic_positional_category", 0x0a81), "top");
-  assert.equal(get("indic_syllabic_category", 0x0a97), "consonant");
-  assert.equal(get("east_asian_width", 0xff01), "fullwidth");
-  assert.equal(getNumber("canonical_combining_class", 0x0300), 230);
-  assert.equal(get("numeric_type", 0x00bd), "numeric");
-  assert.equal(get("numeric_value_decimal", 0x0035), 5);
-  assert.equal(get("numeric_value_digit", 0x00b2), 2);
-  assert.equal(getBoolean("is_bidi_mirrored", 0x0028), true);
-  assert.equal(getString("unicode_1_name", 0), "NULL");
-  assert.equal(get("bidi_mirroring", 0x0028), 0x0029);
-  assert.deepEqual(get("bidi_paired_bracket", 0x0028), { type: "open", codePoint: 0x0029 });
-  assert.deepEqual(get("bidi_paired_bracket", 0x2998), { type: "close", codePoint: 0x2997 });
-});
-
-test("derived boolean properties", () => {
-  assert.equal(getBoolean("is_math", 0x002b), true);
-  assert.equal(getBoolean("is_cased", 0x0041), true);
-  assert.equal(getBoolean("is_case_ignorable", 0x0027), true);
-  assert.equal(getBoolean("changes_when_lowercased", 0x0041), true);
-  assert.equal(getBoolean("changes_when_uppercased", 0x0061), true);
-  assert.equal(getBoolean("changes_when_titlecased", 0x0061), true);
-  assert.equal(getBoolean("changes_when_casefolded", 0x0041), true);
-  assert.equal(getBoolean("changes_when_casemapped", 0x0041), true);
-  assert.equal(getBoolean("is_id_start", 0x0041), true);
-  assert.equal(getBoolean("is_id_continue", 0x0030), true);
-  assert.equal(getBoolean("is_xid_start", 0x0041), true);
-  assert.equal(getBoolean("is_xid_continue", 0x0030), true);
-  assert.equal(getBoolean("is_default_ignorable", 0x00ad), true);
-  assert.equal(getBoolean("is_grapheme_extend", 0x0300), true);
-  assert.equal(getBoolean("is_grapheme_base", 0x0041), true);
-  assert.equal(getBoolean("is_grapheme_link", 0x094d), true);
-  assert.equal(get("indic_conjunct_break", 0x094d), "linker");
-  assert.equal(get("original_grapheme_break", 0x000d), "cr");
+  assert.equal(category, "symbol_math");
 });
 
 test("Go-style Unicode predicate helpers", () => {
@@ -215,22 +154,15 @@ test("public code point helpers reject invalid code points", () => {
 });
 
 test("emoji and wcwidth code point properties", () => {
-  assert.equal(getBoolean("is_emoji", 0x1f600), true);
-  assert.equal(getBoolean("is_emoji_presentation", 0x1f600), true);
-  assert.equal(getBoolean("is_emoji_modifier", 0x1f3fb), true);
-  assert.equal(getBoolean("is_emoji_component", 0x1f3fb), true);
-  assert.equal(getBoolean("is_extended_pictographic", 0x1f600), true);
-  assert.equal(getBoolean("is_emoji_vs_base", 0x231b), true);
-  assert.equal(getNumber("wcwidth_standalone", 0), 0);
-  assert.equal(getNumber("wcwidth_standalone", 0x00ad), 1);
-  assert.equal(getNumber("wcwidth_standalone", 0x20e3), 2);
-  assert.equal(getNumber("wcwidth_standalone", 0x1f1e6), 2);
-  assert.equal(getNumber("wcwidth_standalone", 0x2e3b), 3);
-  assert.equal(getNumber("wcwidth_standalone", 0x00a1), 1);
-  assert.equal(getNumber("wcwidth_standalone", 0x4e00), 2);
-  assert.equal(getBoolean("wcwidth_zero_in_grapheme", 0x0300), true);
   assert.equal(isEmojiPresentation(0x1f600), true);
-  assert.equal(getBoolean("wcwidth_zero_in_grapheme", 0x0903), false);
+  assert.equal(isExtendedPictographic(0x1f600), true);
+  assert.equal(width.codePointWidth(0), 0);
+  assert.equal(width.codePointWidth(0x00ad), 1);
+  assert.equal(width.codePointWidth(0x20e3), 2);
+  assert.equal(width.codePointWidth(0x1f1e6), 2);
+  assert.equal(width.codePointWidth(0x2e3b), 3);
+  assert.equal(width.codePointWidth(0x00a1), 1);
+  assert.equal(width.codePointWidth(0x4e00), 2);
 });
 
 test("grapheme iterator examples", () => {
@@ -261,8 +193,8 @@ test("grapheme break test data", () => {
     const state = { value: "default" as grapheme.BreakState };
     while (parts.length > 0) {
       let expectedBreak = expected === "÷";
-      const gb1 = get("grapheme_break", cp1);
-      const gb2 = get("grapheme_break", cp2);
+      const gb1 = graphemeBreakProperty(cp1);
+      const gb2 = graphemeBreakProperty(cp2);
       if (gb2 === "emoji_modifier" && gb1 !== "emoji_modifier_base") expectedBreak = true;
       assert.equal(
         grapheme.isBreak(cp1, cp2, state),
@@ -288,15 +220,15 @@ test("grapheme break no control test data", () => {
     let expected = parts.shift()!;
     let cp2 = Number.parseInt(parts.shift()!, 16);
     if (
-      ["control", "cr", "lf"].includes(get("grapheme_break", cp1) as string) ||
-      ["control", "cr", "lf"].includes(get("grapheme_break", cp2) as string)
+      ["control", "cr", "lf"].includes(graphemeBreakProperty(cp1)) ||
+      ["control", "cr", "lf"].includes(graphemeBreakProperty(cp2))
     )
       continue;
     const state = { value: "default" as grapheme.BreakState };
     while (parts.length > 0) {
       let expectedBreak = expected === "÷";
-      const gb1 = get("grapheme_break_no_control", cp1);
-      const gb2 = get("grapheme_break_no_control", cp2);
+      const gb1 = toNoControlBreak(graphemeBreakProperty(cp1));
+      const gb2 = toNoControlBreak(graphemeBreakProperty(cp2));
       if (gb2 === "emoji_modifier" && gb1 !== "emoji_modifier_base") expectedBreak = true;
       assert.equal(
         grapheme.isBreakNoControl(cp1, cp2, state),
@@ -307,7 +239,7 @@ test("grapheme break no control test data", () => {
       expected = parts.shift()!;
       if (parts.length === 0) break;
       cp2 = Number.parseInt(parts.shift()!, 16);
-      if (["control", "cr", "lf"].includes(get("grapheme_break", cp2) as string)) continue lineLoop;
+      if (["control", "cr", "lf"].includes(graphemeBreakProperty(cp2))) continue lineLoop;
     }
   }
 });
