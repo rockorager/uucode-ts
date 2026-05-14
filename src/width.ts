@@ -36,11 +36,6 @@ const BREAK_STATE_EXTENDED_PICTOGRAPHIC = 2;
 const BREAK_STATE_INDIC_CONJUNCT_CONSONANT = 3;
 const BREAK_STATE_INDIC_CONJUNCT_LINKER = 4;
 
-function runtimeLookup(cp: number): number {
-  if (!Number.isInteger(cp) || cp < 0 || cp > runtimeWidth.maxCodePoint) return DEFAULT_ROW;
-  return runtimeLookupValid(cp);
-}
-
 function runtimeLookupValid(cp: number): number {
   const stage2Offset = STAGE1[cp >> STAGE1_SHIFT]!;
   const rowIndex = STAGE2[stage2Offset + (cp & STAGE2_MASK)]!;
@@ -53,9 +48,9 @@ function rowGB(row: number): number {
 
 export function codePointWidth(cp: number): number {
   if (!Number.isInteger(cp) || cp < 0 || cp > runtimeWidth.maxCodePoint) {
-    throw new RangeError(`Invalid Unicode code point: ${cp}`);
+    return 0;
   }
-  return (runtimeLookup(cp) >> 5) & WIDTH_MASK;
+  return (runtimeLookupValid(cp) >> 5) & WIDTH_MASK;
 }
 
 function rowWidth(row: number): number {

@@ -431,25 +431,96 @@ const RUNTIME_UNIFIED_IDEOGRAPH_FLAG = 1 << 9;
 const BLOCK_SIZE = 256;
 const NUM_BLOCKS = Math.ceil(COUNT / BLOCK_SIZE);
 
+type CodeRange = readonly [number, number];
+
+const runewidthNonprint: readonly CodeRange[] = [
+  [0x070f, 0x070f],
+  [0x180b, 0x180e],
+  [0x200b, 0x200f],
+  [0x2028, 0x202e],
+  [0x206a, 0x206f],
+  [0xfeff, 0xfeff],
+  [0xfff9, 0xfffb],
+  [0xfffe, 0xffff],
+];
+
+const runewidthCombining: readonly CodeRange[] = [
+  [0x0300, 0x036f],
+  [0x0483, 0x0489],
+  [0x07eb, 0x07f3],
+  [0x0c00, 0x0c00],
+  [0x0c04, 0x0c04],
+  [0x0cf3, 0x0cf3],
+  [0x0d00, 0x0d01],
+  [0x135d, 0x135f],
+  [0x180b, 0x180d],
+  [0x180f, 0x180f],
+  [0x1a7f, 0x1a7f],
+  [0x1ab0, 0x1add],
+  [0x1ae0, 0x1aeb],
+  [0x1b6b, 0x1b73],
+  [0x1dc0, 0x1dff],
+  [0x20d0, 0x20f0],
+  [0x2cef, 0x2cf1],
+  [0x2de0, 0x2dff],
+  [0x3099, 0x309a],
+  [0xa66f, 0xa672],
+  [0xa674, 0xa67d],
+  [0xa69e, 0xa69f],
+  [0xa6f0, 0xa6f1],
+  [0xa8e0, 0xa8f1],
+  [0xfe00, 0xfe0f],
+  [0xfe20, 0xfe2f],
+  [0x101fd, 0x101fd],
+  [0x10376, 0x1037a],
+  [0x10eab, 0x10eac],
+  [0x10f46, 0x10f50],
+  [0x10f82, 0x10f85],
+  [0x11300, 0x11301],
+  [0x1133b, 0x1133c],
+  [0x11366, 0x1136c],
+  [0x11370, 0x11374],
+  [0x16af0, 0x16af4],
+  [0x1cf00, 0x1cf2d],
+  [0x1cf30, 0x1cf46],
+  [0x1d165, 0x1d169],
+  [0x1d16d, 0x1d172],
+  [0x1d17b, 0x1d182],
+  [0x1d185, 0x1d18b],
+  [0x1d1aa, 0x1d1ad],
+  [0x1d242, 0x1d244],
+  [0x1e000, 0x1e006],
+  [0x1e008, 0x1e018],
+  [0x1e01b, 0x1e021],
+  [0x1e023, 0x1e024],
+  [0x1e026, 0x1e02a],
+  [0x1e08f, 0x1e08f],
+  [0x1e8d0, 0x1e8d6],
+  [0xe0100, 0xe01ef],
+];
+
+function inCodeRanges(cp: number, ranges: readonly CodeRange[]): boolean {
+  let lo = 0;
+  let hi = ranges.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (ranges[mid]![1] >= cp) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo < ranges.length && ranges[lo]![0] <= cp;
+}
+
 const wcwidthStandalone = fill(1);
 const wcwidthZeroInGrapheme = fill(false);
 for (let cp = 0; cp < COUNT; cp += 1) {
   const gc = generalCategory[cp]!;
   let width = 1;
-  if (
-    gc === "other_control" ||
-    gc === "other_surrogate" ||
-    gc === "separator_line" ||
-    gc === "separator_paragraph"
-  )
+  if (cp < 0x20 || (cp >= 0x7f && cp <= 0x9f) || cp === 0x00ad || (cp >= 0xd800 && cp <= 0xdfff))
     width = 0;
-  else if (cp === 0x00ad) width = 1;
-  else if (boolFields["is_default_ignorable"]![cp]) width = 0;
-  else if (cp === 0x2e3a) width = 2;
-  else if (cp === 0x2e3b) width = 3;
+  else if (cp < 0x300) width = 1;
+  else if (inCodeRanges(cp, runewidthNonprint) || inCodeRanges(cp, runewidthCombining)) width = 0;
   else if (eastAsianWidth[cp] === "wide" || eastAsianWidth[cp] === "fullwidth") width = 2;
-  else if (graphemeBreak[cp] === "regional_indicator") width = 2;
-  wcwidthStandalone[cp] = cp === 0x20e3 ? 2 : width;
+  wcwidthStandalone[cp] = width;
   wcwidthZeroInGrapheme[cp] =
     width === 0 ||
     emojiFields["is_emoji_modifier"]![cp]! ||

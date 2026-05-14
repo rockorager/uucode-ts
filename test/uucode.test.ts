@@ -151,17 +151,30 @@ test("public code point helpers reject invalid code points", () => {
   assert.throws(() => generalCategory(-1), RangeError);
   assert.throws(() => isSpace(0x110000), RangeError);
   assert.throws(() => toUpper(1.5), RangeError);
-  assert.throws(() => width.codePointWidth(Number.NaN), RangeError);
+});
+
+test("code point width follows standalone rune policy", () => {
+  assert.equal(width.codePointWidth(-1), 0);
+  assert.equal(width.codePointWidth(Number.NaN), 0);
+  assert.equal(width.codePointWidth(0x110000), 0);
+  assert.equal(width.codePointWidth("A".codePointAt(0)!), 1);
+  assert.equal(width.codePointWidth(0x00ad), 0);
+  assert.equal(width.codePointWidth(0x0300), 0);
+  assert.equal(width.codePointWidth(0x0591), 1);
+  assert.equal(width.codePointWidth(0x070f), 0);
+  assert.equal(width.codePointWidth(0x093f), 1);
+  assert.equal(width.codePointWidth(0x0cf3), 0);
+  assert.equal(width.codePointWidth(0x115f), 2);
+  assert.equal(width.codePointWidth(0x20e3), 0);
+  assert.equal(width.codePointWidth(0x4e00), 2);
+  assert.equal(width.codePointWidth(0x1f1e6), 1);
+  assert.equal(width.codePointWidth(0x2a6e0), 2);
 });
 
 test("emoji and wcwidth code point properties", () => {
   assert.equal(isEmojiPresentation(0x1f600), true);
   assert.equal(isExtendedPictographic(0x1f600), true);
   assert.equal(width.codePointWidth(0), 0);
-  assert.equal(width.codePointWidth(0x00ad), 1);
-  assert.equal(width.codePointWidth(0x20e3), 2);
-  assert.equal(width.codePointWidth(0x1f1e6), 2);
-  assert.equal(width.codePointWidth(0x2e3b), 3);
   assert.equal(width.codePointWidth(0x00a1), 1);
   assert.equal(width.codePointWidth(0x4e00), 2);
 });
@@ -325,7 +338,9 @@ test("width API matches uucode wcwidth samples", () => {
     ["ò👨🏻‍❤️‍👨🏿_", 4],
     ["A\u{0300}B", 2],
     ["😀AB", 4],
-    ["\u{20e3}", 2],
+    ["\u200b", 0],
+    ["\u{20e3}", 0],
+    ["\u{1f1e6}", 1],
     ["\u{1f466}\u{1f3fb}", 2],
     ["\u{2601}\u{fe0f}", 2],
     ["\u{2601}\u{fe0e}", 1],

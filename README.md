@@ -57,8 +57,10 @@ import { stringWidth } from "@rockorager/uucode/width";
 ```
 
 Most functions that accept a code point take a JavaScript `number` in the range
-`0x0000..0x10ffff`. Invalid code points throw `RangeError`. Grapheme iterators
-return `{ segment, start, end }`, where offsets are JavaScript string indexes.
+`0x0000..0x10ffff`. Invalid code points throw `RangeError`, except
+`codePointWidth`, which returns `0` to match standalone rune width policy.
+Grapheme iterators return `{ segment, start, end }`, where offsets are
+JavaScript string indexes.
 
 ## Benchmarks
 
