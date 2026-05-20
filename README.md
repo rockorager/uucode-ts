@@ -78,6 +78,15 @@ Terminal width is benchmarked against `string-width` and `wcwidth`:
 | Emoji | 265.5 | 14819.8 | 930.4 |
 | Mixed | 337.1 | 13429.5 | 515.5 |
 
+Grapheme iteration is benchmarked against `Intl.Segmenter`:
+
+| Grapheme benchmark | @rockorager/uucode ns/op | Intl.Segmenter ns/op | Ratio |
+|---|---:|---:|---:|
+| ASCII | 1199.4 | 10369.0 | 8.65x |
+| Combining | 649.2 | 4713.3 | 7.26x |
+| Emoji | 574.6 | 2505.0 | 4.36x |
+| Mixed | 761.6 | 5286.7 | 6.94x |
+
 General category lookup has no direct native equivalent:
 
 | Benchmark | @rockorager/uucode ns/op |

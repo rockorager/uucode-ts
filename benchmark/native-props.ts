@@ -5,6 +5,7 @@ import {
   codePointWidth,
   equalFold,
   generalCategory,
+  graphemes,
   isASCIIHexDigit,
   isDash,
   isDiacritic,
@@ -74,6 +75,8 @@ const equalFoldRegexes = equalFoldPairs.map(
 );
 const iterations = 250_000;
 const widthIterations = 250_000;
+const graphemeIterations = 250_000;
+const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 const upperRegex = /\p{Lu}/u;
 const lowerRegex = /\p{Ll}/u;
 const titleRegex = /\p{Lt}/u;
@@ -120,6 +123,28 @@ function benchWidth(name: string, fn: () => unknown): void {
   const elapsedNs = Number(process.hrtime.bigint() - start);
   const nsPerOp = elapsedNs / widthIterations;
   console.log(`${name}: ${(elapsedNs / 1e6).toFixed(2)}ms (${nsPerOp.toFixed(1)} ns/op)`);
+}
+
+function benchGraphemes(name: string, fn: () => unknown): void {
+  const start = process.hrtime.bigint();
+  for (let i = 0; i < graphemeIterations; i += 1) fn();
+  const elapsedNs = Number(process.hrtime.bigint() - start);
+  const nsPerOp = elapsedNs / graphemeIterations;
+  console.log(`${name}: ${(elapsedNs / 1e6).toFixed(2)}ms (${nsPerOp.toFixed(1)} ns/op)`);
+}
+
+function countUucodeGraphemes(input: string): number {
+  let count = 0;
+  const iterator = graphemes(input);
+  while (iterator.nextSegment()) count += 1;
+  return count;
+}
+
+function countIntlGraphemes(input: string): number {
+  let count = 0;
+  const iterator = graphemeSegmenter.segment(input)[Symbol.iterator]();
+  while (!iterator.next().done) count += 1;
+  return count;
 }
 
 function escapeRegExp(value: string): string {
@@ -378,6 +403,11 @@ for (const { name, s } of benchmarkStrings) {
   benchWidth(`uucode-ts width/${name}`, () => stringWidth(s));
   benchWidth(`string-width width/${name}`, () => stringWidthPackage(s));
   benchWidth(`wcwidth width/${name}`, () => wcwidth(s));
+}
+
+for (const { name, s } of benchmarkStrings) {
+  benchGraphemes(`uucode-ts graphemes/${name}`, () => countUucodeGraphemes(s));
+  benchGraphemes(`Intl.Segmenter graphemes/${name}`, () => countIntlGraphemes(s));
 }
 
 i = 0;
